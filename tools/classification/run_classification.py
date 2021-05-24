@@ -196,7 +196,6 @@ def main():
         cfg['data']['targets'] = [targets]
         # dump it
         fd, tmp_path_to_cfg = tempfile.mkstemp(suffix='.yml')
-        print(tmp_path_to_cfg)
         try:
             with os.fdopen(fd, 'w') as tmp:
                 # do stuff with temp file
