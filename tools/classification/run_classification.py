@@ -22,8 +22,7 @@ def dump_config(yaml: YAML, config_path: str, cfg: dict):
 
 def main():
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    parser.add_argument( '--data_root', type=str, required=False, default='/media/cluster_fs/datasets/classification',
-                            required=False, help='path to folder with datasets')
+    parser.add_argument( '--data_root', type=str, required=False, default='/media/cluster_fs/datasets/classification', help='path to folder with datasets')
     parser.add_argument('--config', type=str, required=False, help='path to config file')
     parser.add_argument('--path_to_main', type=str, default='./tools/main.py',required=False, help='path to main.py file')
     parser.add_argument('--gpu-num', type=int, default=1, help='Number of GPUs for training. 0 is for CPU mode')
@@ -196,7 +195,8 @@ def main():
         cfg['data']['sources'] = [source]
         cfg['data']['targets'] = [targets]
         # dump it
-        fd, tmp_path_to_cfg = tempfile.mkstemp()
+        fd, tmp_path_to_cfg = tempfile.mkstemp(suffix='.yml')
+        print(tmp_path_to_cfg)
         try:
             with os.fdopen(fd, 'w') as tmp:
                 # do stuff with temp file
