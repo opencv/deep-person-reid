@@ -537,13 +537,14 @@ class Engine:
         self.set_model_mode('eval')
         targets = list(self.test_loader.keys())
         top1, mAP, top5 = [None]*3
+        cur_top1, cur_mAP, cur_top5 = [None]*3
         for dataset_name in targets:
             domain = 'source' if dataset_name in self.datamanager.sources else 'target'
             print('##### Evaluating {} ({}) #####'.format(dataset_name, domain))
 
-            for model_name, model in self.models.items():
+            for model_id, (model_name, model) in enumerate(self.models.items()):
                 if get_model_attr(model, 'classification'):
-                    top1, top5, mAP = self._evaluate_classification(
+                    cur_top1, cur_top5, cur_mAP = self._evaluate_classification(
                         model=model,
                         epoch=epoch,
                         data_loader=self.test_loader[dataset_name]['query'],
@@ -562,7 +563,7 @@ class Engine:
                         model_name=model_name
                     )
                 else:
-                    top1, top5, mAP = self._evaluate_reid(
+                    cur_top1, cur_top5, cur_mAP = self._evaluate_reid(
                         model=model,
                         epoch=epoch,
                         model_name=model_name,
@@ -579,6 +580,12 @@ class Engine:
                         rerank=rerank,
                         lr_finder = lr_finder
                     )
+
+                if model_id == 0:
+                    # the function should return accuracy results for the first (main) model only
+                    top1 = cur_top1
+                    top5 = cur_top5
+                    mAP = cur_mAP
         return  top1, top5, mAP
 
     @torch.no_grad()
