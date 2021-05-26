@@ -90,6 +90,8 @@ class Engine:
         self.epoch_interval_for_turn_off_mutual_learning = epoch_interval_for_turn_off_mutual_learning
         self.model_names_to_freeze = []
 
+        self.lr_of_previous_iter = None
+
         if isinstance(models, (tuple, list)):
             assert isinstance(optimizers, (tuple, list))
             assert isinstance(schedulers, (tuple, list))
@@ -221,25 +223,33 @@ class Engine:
         epochs.
         '''
         name = self.get_model_names()[0]
-        current_lr = self.get_current_lr()
+
+        # Note that we take LR of the previous iter, not self.get_current_lr(),
+        # since typically the method exit_on_plateau_and_choose_best is called after
+        # the method update_lr, so LR drop happens before.
+        # If we had used the method self.get_current_lr(), the last epoch
+        # before LR drop would be used as the first epoch with the new LR.
+        last_lr = self.lr_of_previous_iter
+        if last_lr is None:
+            print('WARNING: The method exit_on_plateau_and_choose_best should be called after the method train')
 
         should_exit = False
         is_candidate_for_best = False
 
         current_metric = np.round(top1, 4)
 
-        if self.lr_prev_best_metric == current_lr and self.best_metric >= current_metric:
+        if self.lr_prev_best_metric == last_lr and self.best_metric >= current_metric:
             # not best
             self.iter_to_wait += 1
 
-            if (current_lr <= self.lb_lr) and (self.iter_to_wait >= self.train_patience):
+            if (last_lr is not None) and (last_lr <= self.lb_lr) and (self.iter_to_wait >= self.train_patience):
                 print("The training should be stopped due to no improvements for {} epochs".format(self.train_patience))
                 should_exit = True
         else:
             # best for this LR
             self.best_metric = current_metric
             self.iter_to_wait = 0
-            self.lr_prev_best_metric = current_lr
+            self.lr_prev_best_metric = last_lr
             is_candidate_for_best = True
 
         return should_exit, is_candidate_for_best
@@ -499,6 +509,7 @@ class Engine:
                     self.writer.add_scalar('Loss/' + name, meter.avg, n_iter)
 
             end = time.time()
+            self.lr_of_previous_iter = self.get_current_lr()
             if stop_callback and stop_callback.check_stop():
                 break
 
