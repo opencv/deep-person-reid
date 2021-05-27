@@ -325,18 +325,19 @@ class Engine:
                                     )
             return test_results
 
-        print('Test before training')
-        self.test(
-                  0,
-                  dist_metric=dist_metric,
-                  normalize_feature=normalize_feature,
-                  visrank=visrank,
-                  visrank_topk=visrank_topk,
-                  save_dir=save_dir,
-                  use_metric_cuhk03=use_metric_cuhk03,
-                  ranks=ranks,
-                  rerank=rerank,
-        )
+        if not lr_finder:
+            print('Test before training')
+            self.test(
+                      0,
+                      dist_metric=dist_metric,
+                      normalize_feature=normalize_feature,
+                      visrank=visrank,
+                      visrank_topk=visrank_topk,
+                      save_dir=save_dir,
+                      use_metric_cuhk03=use_metric_cuhk03,
+                      ranks=ranks,
+                      rerank=rerank,
+            )
 
         self.writer = tb_writer
 
@@ -423,14 +424,12 @@ class Engine:
 
     def _freeze_aux_models(self):
         for model_name in self.model_names_to_freeze:
-            print(f'Freezing model {model_name}')
             model = self.models[model_name]
             model.eval()
             open_specified_layers(model, [])
 
     def _unfreeze_aux_models(self):
         for model_name in self.model_names_to_freeze:
-            print(f'Unfreezing model {model_name}')
             model = self.models[model_name]
             model.train()
             open_all_layers(model)
@@ -448,7 +447,6 @@ class Engine:
             # NB: it should be done before `two_stepped_transfer_learning`
             # to give possibility to freeze some layers in the unlikely event
             # that `two_stepped_transfer_learning` is used together with nncf
-            print('Unfreezing aux models')
             self._unfreeze_aux_models()
 
         self.two_stepped_transfer_learning(
@@ -456,7 +454,6 @@ class Engine:
         )
 
         if self._should_freeze_aux_models(self.epoch):
-            print('Freezing aux models')
             self._freeze_aux_models()
 
         self.num_batches = len(self.train_loader)
@@ -597,7 +594,7 @@ class Engine:
                     top1 = cur_top1
                     top5 = cur_top5
                     mAP = cur_mAP
-        return  top1, top5, mAP
+        return top1, top5, mAP
 
     @torch.no_grad()
     def _evaluate_classification(self, model, epoch, data_loader, model_name, dataset_name, ranks, lr_finder):
