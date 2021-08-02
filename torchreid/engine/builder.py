@@ -7,7 +7,7 @@ def build_engine(cfg, datamanager, model, optimizer, scheduler,
                  nncf_metainfo=None,
                  initial_lr=None):
     if should_freeze_aux_models or nncf_metainfo:
-        if (cfg.data.type != 'image') or (cfg.loss.name not in ['softmax', 'am_softmax']):
+        if cfg.loss.name not in ['softmax', 'am_softmax']:
             raise NotImplementedError('Freezing of aux models or NNCF compression are supported only for '
                                       'softmax and am_softmax losses for data.type = image')
 
