@@ -135,12 +135,14 @@ def _build_optim(model,
                 decay.append(m.weight)
                 if m.bias is not None:
                     bias_no_decay.append(m.bias)
-            else:
+            elif hasattr(m, 'weight') or hasattr(m, 'bias'):
                 if hasattr(m, 'weight'):
                     weight_no_decay.append(m.weight)
                 if hasattr(m, 'bias'):
                     bias_no_decay.append(m.bias)
-
+            elif len(list(m.children())) == 0:
+                for p in m.parameters():
+                    decay.append(p)
         assert len(list(model.parameters())) == len(decay) + len(bias_no_decay) + len(weight_no_decay)
 
         param_groups = [{'params': decay, 'lr': lr, 'weight_decay': weight_decay},
