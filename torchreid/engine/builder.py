@@ -10,7 +10,7 @@ def build_engine(cfg, datamanager, model, optimizer, scheduler,
         if cfg.loss.name not in ['softmax', 'am_softmax']:
             raise NotImplementedError('Freezing of aux models or NNCF compression are supported only for '
                                       'softmax and am_softmax losses for data.type = image')
-
+    initial_lr = initial_lr if initial_lr else cfg.train.lr
     if cfg.loss.name in ['softmax', 'am_softmax']:
         softmax_type = 'stock' if cfg.loss.name == 'softmax' else 'am'
         engine = ImageAMSoftmaxEngine(

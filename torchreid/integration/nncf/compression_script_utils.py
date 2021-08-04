@@ -145,6 +145,7 @@ def make_nncf_changes_in_training(model, cfg, classes, command_line_cfg_opts):
     lr = calculate_lr_for_nncf_training(cfg.train.lr, checkpoint_path,
                                         coeff_decrease_lr_for_nncf,
                                         is_initial_lr_set_from_opts)
+    assert lr is not None
     cfg.train.lr = lr
     return model, cfg, lr, nncf_metainfo
 

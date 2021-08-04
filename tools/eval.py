@@ -84,7 +84,7 @@ def main():
     if cfg.model.classification:
         check_classification_classes(model, datamanager, args.classes, test_only=True)
 
-    engine = build_engine(cfg, datamanager, model, None, None)
+    engine = build_engine(cfg=cfg, datamanager=datamanager, model=model, optimizer=None, scheduler=None)
     engine.test(0,
                 dist_metric=cfg.test.dist_metric,
                 normalize_feature=cfg.test.normalize_feature,

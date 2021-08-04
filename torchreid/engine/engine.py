@@ -125,6 +125,7 @@ class Engine:
             self.register_model('model', models, optimizers, schedulers)
         self.main_model_name = self.get_model_names()[0]
         self.model_device = next(self.models[self.main_model_name].parameters()).device
+        assert initial_lr is not None
         self.lb_lr = initial_lr / lr_decay_factor
 
     def _should_freeze_aux_models(self, epoch):
