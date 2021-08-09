@@ -141,8 +141,12 @@ class Dataset:
         for record in data:
             dataset_id = record[3] if len(record) > 3 else 0
             if isinstance(record[1], (tuple, list)):
+<<<<<<< HEAD
                 for ids in record[1]:
                     pids[dataset_id].add(ids)
+=======
+                [pids[dataset_id].add(ids) for ids in record[1]]
+>>>>>>> debug datasets
             else:
                 pids[dataset_id].add(record[1])
             cams[dataset_id].add(record[2])

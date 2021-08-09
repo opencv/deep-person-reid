@@ -7,6 +7,7 @@ from collections import namedtuple, OrderedDict
 from copy import deepcopy
 from torchreid.utils.tools import StateCacher, set_random_seed
 import optuna
+from icecream import ic
 
 import numpy as np
 import torch
