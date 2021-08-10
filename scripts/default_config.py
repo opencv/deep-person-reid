@@ -144,7 +144,7 @@ def get_default_config():
     cfg.train.warmup = 1  # After fixbase_epoch
     cfg.train.ema = CN()
     cfg.train.ema.enable = False
-    cfg.train.ema.ema_decay = 0.999
+    cfg.train.ema.ema_decay = 0.9999
 
     # optimizer
     cfg.sgd = CN()
