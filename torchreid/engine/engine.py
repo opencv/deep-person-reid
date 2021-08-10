@@ -7,7 +7,6 @@ from collections import namedtuple, OrderedDict
 from copy import deepcopy
 from torchreid.utils.tools import StateCacher, set_random_seed
 import optuna
-from icecream import ic
 
 import numpy as np
 import torch
@@ -249,7 +248,6 @@ class Engine:
     def exit_on_plateau_and_choose_best(self, top1, smooth_top1):
         '''
         The function returns a pair (should_exit, is_candidate_for_best).
-
         Default implementation of the method returns False for should_exit.
         Other behavior must be overridden in derived classes from the base Engine.
         '''
@@ -289,7 +287,6 @@ class Engine:
         **kwargs
     ):
         r"""A unified pipeline for training and evaluating a model.
-
         Args:
             save_dir (str): directory to save model.
             max_epoch (int): maximum epoch.
@@ -362,7 +359,6 @@ class Engine:
         self.fixbase_epoch = fixbase_epoch
         test_acc = AverageMeter()
         print('=> Start training')
-
         if perf_monitor and not lr_finder: perf_monitor.on_train_begin()
         for self.epoch in range(self.start_epoch, self.max_epoch):
             # change the NumPy’s seed at every epoch
@@ -596,13 +592,9 @@ class Engine:
         test_only=False
     ):
         r"""Tests model on target datasets.
-
         .. note::
-
             This function has been called in ``run()``.
-
         .. note::
-
             The test pipeline implemented in this function suits both image- and
             video-reid. In general, a subclass of Engine only needs to re-implement
             ``extract_features()`` and ``parse_data_for_eval()`` (most of the time),
@@ -907,10 +899,8 @@ class Engine:
 
     def two_stepped_transfer_learning(self, epoch, fixbase_epoch, open_layers):
         """Two-stepped transfer learning.
-
         The idea is to freeze base layers for a certain number of epochs
         and then open all layers for training.
-
         Reference: https://arxiv.org/abs/1611.05244
         """
 

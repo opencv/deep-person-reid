@@ -375,7 +375,11 @@ class ImageDataset(Dataset):
 
         if len(input_record) > 3:
             dataset_id = input_record[3]
+<<<<<<< HEAD
             if isinstance(obj_id, (tuple, list)): # when multi-label classification is available
+=======
+            if isinstance(obj_id, (tuple, list)): # than multi-label classification is available
+>>>>>>> added new EMA, fix dataset
                 targets = torch.zeros(self.num_train_pids[dataset_id])
                 for obj in obj_id:
                     targets[obj] = 1
