@@ -32,7 +32,10 @@ class ModelInterface(nn.Module):
         self.type = type
         self.pretrained = pretrained
         self.classification_classes = {}
+<<<<<<< HEAD
         self.is_ie_model = False
+=======
+>>>>>>> Introduce model type to config
         self.loss = loss
         self.use_angle_simple_linear = True if loss == 'am_softmax' else False
 
