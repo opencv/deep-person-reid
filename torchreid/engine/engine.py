@@ -640,10 +640,13 @@ class Engine:
             for model_id, (model_name, model) in enumerate(self.models.items()):
                 model_type = get_model_attr(model, 'type')
                 if model_type == 'classification':
+<<<<<<< HEAD
                     # do not evaluate second model till last epoch
                     if (model_name != self.main_model_name
                         and not test_only and epoch != (self.max_epoch - 1)):
                         continue
+=======
+>>>>>>> Introduce model type to config
                     cur_top1, cur_top5, cur_mAP = self._evaluate_classification(
                         model=model,
                         epoch=epoch,
@@ -653,6 +656,7 @@ class Engine:
                         ranks=ranks,
                         lr_finder=lr_finder
                     )
+<<<<<<< HEAD
                     if self.use_ema_decay and not lr_finder and not test_only:
                         ema_top1, ema_top5, ema_mAP = self._evaluate_classification(
                             model=self.ema_model.module,
@@ -664,6 +668,9 @@ class Engine:
                             lr_finder = lr_finder
                         )
                 elif model_type == 'contrastive':
+=======
+                elif model_type == 'contrastive' or model_type == 'multilabel':
+>>>>>>> Introduce model type to config
                     pass
                 elif model_type == 'multilabel':
                     cur_mAP = self._evaluate_multilabel_classification(
