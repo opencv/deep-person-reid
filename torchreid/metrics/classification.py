@@ -179,7 +179,11 @@ def evaluate_multilabel_classification(dataloader, model, use_gpu):
         return precision_at_i
 
 
+<<<<<<< HEAD
     def mAP(targs, preds, pos_thr=0.5):
+=======
+    def mAP(targs, preds):
+>>>>>>> Fix multilabel mAP calculation
         """Returns the model's average precision for each class
         Return:
             ap (FloatTensor): 1xK tensor, with avg precision for each class k
@@ -190,6 +194,7 @@ def evaluate_multilabel_classification(dataloader, model, use_gpu):
         ap = np.zeros((preds.shape[1]))
         # compute average precision for each class
         for k in range(preds.shape[1]):
+<<<<<<< HEAD
             scores = preds[:, k]
             targets = targs[:, k]
             ap[k] = average_precision(scores, targets)
@@ -221,13 +226,25 @@ def evaluate_multilabel_classification(dataloader, model, use_gpu):
 
         return ap.mean(), mean_p_c, mean_r_c, mean_f_c, p_o, r_o, f_o
 
+=======
+            # sort scores
+            scores = preds[:, k]
+            targets = targs[:, k]
+            # compute average precision
+            ap[k] = average_precision(scores, targets)
+        return 100 * ap.mean()
+>>>>>>> Fix multilabel mAP calculation
 
     if isinstance(model, torch.nn.Module):
         scores, labels = score_extraction(dataloader, model, use_gpu)
     else:
         scores, labels = score_extraction_from_ir(dataloader, model)
 
+<<<<<<< HEAD
     scores = 1. / (1 + np.exp(-scores))
     mAP_score = mAP(labels, scores)
+=======
+    mAP_score = mAP(1. / (1 + np.exp(-scores)), labels)
+>>>>>>> Fix multilabel mAP calculation
 
     return mAP_score

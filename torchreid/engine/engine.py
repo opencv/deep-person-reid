@@ -657,6 +657,7 @@ class Engine:
                         lr_finder=lr_finder
                     )
 <<<<<<< HEAD
+<<<<<<< HEAD
                     if self.use_ema_decay and not lr_finder and not test_only:
                         ema_top1, ema_top5, ema_mAP = self._evaluate_classification(
                             model=self.ema_model.module,
@@ -671,6 +672,9 @@ class Engine:
 =======
                 elif model_type == 'contrastive' or model_type == 'multilabel':
 >>>>>>> Introduce model type to config
+=======
+                elif model_type == 'contrastive':
+>>>>>>> Fix multilabel mAP calculation
                     pass
                 elif model_type == 'multilabel':
                     cur_mAP = self._evaluate_multilabel_classification(
@@ -759,6 +763,20 @@ class Engine:
                     mAP =  max(cur_mAP, ema_mAP) if self.use_ema_decay else cur_mAP
         return top1, top5, mAP
 >>>>>>> added new EMA, fix dataset
+
+    torch.no_grad()
+    def _evaluate_multilabel_classification(self, model, epoch, data_loader, model_name, dataset_name, lr_finder):
+
+        mAP = metrics.evaluate_multilabel_classification(data_loader, model, self.use_gpu)
+
+        if self.writer is not None and not lr_finder:
+            self.writer.add_scalar('Val/{}/{}/mAP'.format(dataset_name, model_name), mAP, epoch + 1)
+
+        if not lr_finder:
+            print('** Results ({}) **'.format(model_name))
+            print('mAP: {:.2%}'.format(mAP))
+
+        return mAP
 
     @torch.no_grad()
     def _evaluate_classification(self, model, epoch, data_loader, model_name, dataset_name, ranks, lr_finder):
