@@ -142,11 +142,16 @@ class Dataset:
             dataset_id = record[3] if len(record) > 3 else 0
             if isinstance(record[1], (tuple, list)):
 <<<<<<< HEAD
+<<<<<<< HEAD
                 for ids in record[1]:
                     pids[dataset_id].add(ids)
 =======
                 [pids[dataset_id].add(ids) for ids in record[1]]
 >>>>>>> debug datasets
+=======
+                for ids in record[1]:
+                    pids[dataset_id].add(ids)
+>>>>>>> Fix multilabel mAP calculation
             else:
                 pids[dataset_id].add(record[1])
             cams[dataset_id].add(record[2])
@@ -376,10 +381,14 @@ class ImageDataset(Dataset):
         if len(input_record) > 3:
             dataset_id = input_record[3]
 <<<<<<< HEAD
+<<<<<<< HEAD
             if isinstance(obj_id, (tuple, list)): # when multi-label classification is available
 =======
             if isinstance(obj_id, (tuple, list)): # than multi-label classification is available
 >>>>>>> added new EMA, fix dataset
+=======
+            if isinstance(obj_id, (tuple, list)): # when multi-label classification is available
+>>>>>>> Fix multilabel mAP calculation
                 targets = torch.zeros(self.num_train_pids[dataset_id])
                 for obj in obj_id:
                     targets[obj] = 1

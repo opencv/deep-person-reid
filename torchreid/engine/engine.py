@@ -720,6 +720,20 @@ class Engine:
 
         return mAP
 
+    torch.no_grad()
+    def _evaluate_multilabel_classification(self, model, epoch, data_loader, model_name, dataset_name, lr_finder):
+
+        mAP = metrics.evaluate_multilabel_classification(data_loader, model, self.use_gpu)
+
+        if self.writer is not None and not lr_finder:
+            self.writer.add_scalar('Val/{}/{}/mAP'.format(dataset_name, model_name), mAP, epoch + 1)
+
+        if not lr_finder:
+            print('** Results ({}) **'.format(model_name))
+            print('mAP: {:.2%}'.format(mAP))
+
+        return mAP
+
     @torch.no_grad()
     def _evaluate_classification(self, model, epoch, data_loader, model_name, dataset_name, ranks, lr_finder):
         labelmap = []
