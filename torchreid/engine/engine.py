@@ -7,7 +7,6 @@ from collections import namedtuple, OrderedDict
 from copy import deepcopy
 from torchreid.utils.tools import StateCacher, set_random_seed
 import optuna
-from icecream import ic
 
 import numpy as np
 import torch
@@ -109,14 +108,8 @@ class Engine:
             for model_id, (model, optimizer, scheduler) in enumerate(zip(models, optimizers, schedulers)):
                 model_name = 'main_model' if model_id == 0 else f'aux_model_{model_id}'
                 self.register_model(model_name, model, optimizer, scheduler)
-<<<<<<< HEAD
                 if use_ema_decay and model_id == 0:
                     self.ema_model = ModelEmaV2(model, decay=ema_decay)
-=======
-                if use_ema_decay:
-                    ema_model = ModelEmaV2(model, decay=ema_decay)
-                    self.ema_wrapped_models.append(ema_model)
->>>>>>> added new EMA, fix dataset
                 if should_freeze_aux_models and model_id > 0:
                     self.model_names_to_freeze.append(model_name)
         else:
@@ -125,13 +118,7 @@ class Engine:
             assert not isinstance(models, (tuple, list))
             self.register_model('main_model', models, optimizers, schedulers)
             if use_ema_decay:
-<<<<<<< HEAD
                 self.ema_model = ModelEmaV2(models, decay=ema_decay)
-=======
-                ema_model = ModelEmaV2(models, decay=ema_decay)
-                self.ema_wrapped_models.append(ema_model)
-            self.register_model('model', models, optimizers, schedulers)
->>>>>>> added new EMA, fix dataset
         self.main_model_name = self.get_model_names()[0]
         assert initial_lr is not None
         self.lb_lr = initial_lr / lr_decay_factor
@@ -429,12 +416,8 @@ class Engine:
                     should_exit = self.early_stoping and should_exit
 
                     if self.save_chkpt:
-<<<<<<< HEAD
                         self.save_model(self.epoch, save_dir, is_best=is_candidate_for_best,
                                             should_save_ema_model=should_save_ema_model)
-=======
-                        self.save_model(self.epoch, save_dir, is_best=is_candidate_for_best)
->>>>>>> added new EMA, fix dataset
                     if should_exit:
                         break
 
@@ -569,12 +552,7 @@ class Engine:
             if stop_callback and stop_callback.check_stop():
                 break
             if not lr_finder and self.use_ema_decay:
-<<<<<<< HEAD
                 self.ema_model.update(self.models[self.main_model_name])
-=======
-                for ema_model, model in zip(self.ema_wrapped_models, self.models):
-                    ema_model.update(model)
->>>>>>> added new EMA, fix dataset
 
         if not lr_finder:
             self.update_lr(output_avg_metric = losses.meters['loss'].avg)
@@ -615,38 +593,18 @@ class Engine:
         top1, mAP, top5 = [None]*3
         cur_top1, cur_mAP, cur_top5 = [None]*3
         ema_top1, ema_mAP, ema_top5 = [0]*3
-<<<<<<< HEAD
         should_save_ema_model = False
 
-=======
-        if self.use_ema_decay and not lr_finder and not test_before_train:
-            for dataset_name in targets:
-                for ema_model in self.ema_wrapped_models:
-                    for model_id, (model_name, model) in enumerate(self.models.items()):
-                        if get_model_attr(model, 'classification'):
-                            ema_top1, ema_top5, ema_mAP = self._evaluate_classification(
-                                model=ema_model.module,
-                                epoch=epoch,
-                                data_loader=self.test_loader[dataset_name]['query'],
-                                model_name=model_name,
-                                dataset_name=dataset_name,
-                                ranks=ranks,
-                                lr_finder = lr_finder
-                            )
->>>>>>> added new EMA, fix dataset
         for dataset_name in targets:
             domain = 'source' if dataset_name in self.datamanager.sources else 'target'
             print('##### Evaluating {} ({}) #####'.format(dataset_name, domain))
             for model_id, (model_name, model) in enumerate(self.models.items()):
                 model_type = get_model_attr(model, 'type')
                 if model_type == 'classification':
-<<<<<<< HEAD
                     # do not evaluate second model till last epoch
                     if (model_name != self.main_model_name
                         and not test_only and epoch != (self.max_epoch - 1)):
                         continue
-=======
->>>>>>> Introduce model type to config
                     cur_top1, cur_top5, cur_mAP = self._evaluate_classification(
                         model=model,
                         epoch=epoch,
@@ -656,8 +614,6 @@ class Engine:
                         ranks=ranks,
                         lr_finder=lr_finder
                     )
-<<<<<<< HEAD
-<<<<<<< HEAD
                     if self.use_ema_decay and not lr_finder and not test_only:
                         ema_top1, ema_top5, ema_mAP = self._evaluate_classification(
                             model=self.ema_model.module,
@@ -669,12 +625,6 @@ class Engine:
                             lr_finder = lr_finder
                         )
                 elif model_type == 'contrastive':
-=======
-                elif model_type == 'contrastive' or model_type == 'multilabel':
->>>>>>> Introduce model type to config
-=======
-                elif model_type == 'contrastive':
->>>>>>> Fix multilabel mAP calculation
                     pass
                 elif model_type == 'multilabel':
                     cur_mAP = self._evaluate_multilabel_classification(
@@ -725,7 +675,6 @@ class Engine:
 
                 if model_id == 0:
                     # the function should return accuracy results for the first (main) model only
-<<<<<<< HEAD
                     if ema_top1 >= cur_top1 and self.use_ema_decay:
                         should_save_ema_model = True
                         top1 = ema_top1
@@ -755,26 +704,6 @@ class Engine:
             print('mean_P_C: {:.2%}'.format(mean_p_c))
             print('mean_R_C: {:.2%}'.format(mean_r_c))
             print('mean_F_C: {:.2%}'.format(mean_f_c))
-
-        return mAP
-=======
-                    top1 = max(cur_top1, ema_top1) if self.use_ema_decay else cur_top1
-                    top5 =  max(cur_top5, ema_top5) if self.use_ema_decay else cur_top5
-                    mAP =  max(cur_mAP, ema_mAP) if self.use_ema_decay else cur_mAP
-        return top1, top5, mAP
->>>>>>> added new EMA, fix dataset
-
-    torch.no_grad()
-    def _evaluate_multilabel_classification(self, model, epoch, data_loader, model_name, dataset_name, lr_finder):
-
-        mAP = metrics.evaluate_multilabel_classification(data_loader, model, self.use_gpu)
-
-        if self.writer is not None and not lr_finder:
-            self.writer.add_scalar('Val/{}/{}/mAP'.format(dataset_name, model_name), mAP, epoch + 1)
-
-        if not lr_finder:
-            print('** Results ({}) **'.format(model_name))
-            print('mAP: {:.2%}'.format(mAP))
 
         return mAP
 
