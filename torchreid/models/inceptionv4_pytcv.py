@@ -645,7 +645,11 @@ class InceptionV4(ModelInterface):
                 in_features=self.feature_dim,
                 out_features=num_classes))
         else:
+<<<<<<< HEAD
             assert self.loss in ['am_softmax', 'am_binary']
+=======
+            assert self.loss in ['am_softmax', 'am_asl']
+>>>>>>> Added initial implementation asl-amsoftmax
             self.output.add_module("asl", AngleSimpleLinear(
                 in_features=self.feature_dim,
                 out_features=num_classes))
