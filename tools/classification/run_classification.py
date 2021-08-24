@@ -232,36 +232,36 @@ def main():
             else:
                 cfg['lr_finder']["enable"] = True
 
-        # cfg['custom_datasets']['roots'] = [root_train, root_val]
-        # cfg['custom_datasets']['types'] = [type_train, type_val]
-        # cfg['custom_datasets']['names'] = [name_train, name_val]
+        cfg['custom_datasets']['roots'] = [root_train, root_val]
+        cfg['custom_datasets']['types'] = [type_train, type_val]
+        cfg['custom_datasets']['names'] = [name_train, name_val]
 
-        # cfg['data']['height'] = params['resolution'][0]
-        # cfg['data']['width'] = params['resolution'][1]
-        # cfg['data']['save_dir'] = path_to_exp_folder + f"/{key}"
+        cfg['data']['height'] = params['resolution'][0]
+        cfg['data']['width'] = params['resolution'][1]
+        cfg['data']['save_dir'] = path_to_exp_folder + f"/{key}"
 
-        # source = params['sources']
-        # targets = params['targets']
-        # cfg['data']['sources'] = [source]
-        # cfg['data']['targets'] = [targets]
-        # # dump it
-        # fd, tmp_path_to_cfg = tempfile.mkstemp(suffix='.yml')
-        # try:
-        #     with os.fdopen(fd, 'w') as tmp:
-        #         # do stuff with temp file
-        #         yaml.default_flow_style = True
-        #         yaml.dump(cfg, tmp)
-        #         tmp.close()
+        source = params['sources']
+        targets = params['targets']
+        cfg['data']['sources'] = [source]
+        cfg['data']['targets'] = [targets]
+        # dump it
+        fd, tmp_path_to_cfg = tempfile.mkstemp(suffix='.yml')
+        try:
+            with os.fdopen(fd, 'w') as tmp:
+                # do stuff with temp file
+                yaml.default_flow_style = True
+                yaml.dump(cfg, tmp)
+                tmp.close()
 
-        #     # run training
-        #     run(
-        #         f'python {str(args.path_to_main)}'
-        #         f' --config {tmp_path_to_cfg}'
-        #         f' --gpu-num {int(args.gpu_num)}',
-        #         shell=True
-        #         )
-        # finally:
-        #     os.remove(tmp_path_to_cfg)
+            # run training
+            run(
+                f'python {str(args.path_to_main)}'
+                f' --config {tmp_path_to_cfg}'
+                f' --gpu-num {int(args.gpu_num)}',
+                shell=True
+                )
+        finally:
+            os.remove(tmp_path_to_cfg)
     # after training combine all outputs in one file
     if args.dump_results:
         path_to_bash = str(Path.cwd() / 'parse_output.sh')

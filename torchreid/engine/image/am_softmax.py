@@ -35,7 +35,6 @@ from torchreid.optim import SAM
 class ImageAMSoftmaxEngine(Engine):
     r"""AM-Softmax-loss engine for image-reid.
     """
-
     def __init__(self, datamanager, models, optimizers, reg_cfg, metric_cfg, schedulers, use_gpu, save_chkpt,
                  train_patience, early_stoping, lr_decay_factor, loss_name, label_smooth,
                  margin_type, aug_type, decay_power, alpha, size, lr_finder, max_soft,

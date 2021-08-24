@@ -23,6 +23,7 @@ _VALID_MODEL_TYPES = ['classification', 'contrastive', 'reid', 'multilabel']
 class ModelInterface(nn.Module):
     def __init__(self,
                 type,
+                feature_dim,
                 pretrained=False,
                 loss='softmax',
                 **kwargs):
@@ -34,10 +35,14 @@ class ModelInterface(nn.Module):
         self.classification_classes = {}
         self.is_ie_model = False
         self.loss = loss
+        self.num_features = feature_dim
         self.use_angle_simple_linear = True if loss == 'am_softmax' else False
 
     def is_classification(self):
         return self.type == 'classification' or self.type == 'multilabel'
+
+    def get_num_features(self):
+        return self.num_features
 
     @staticmethod
     def _glob_feature_vector(x, mode, reduce_dims=True):
