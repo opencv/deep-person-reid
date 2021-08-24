@@ -54,6 +54,7 @@ class Engine:
                  save_chkpt=True,
                  train_patience = 10,
                  lr_decay_factor = 1000,
+                 lr_finder = None,
                  early_stoping=False,
                  should_freeze_aux_models=False,
                  nncf_metainfo=None,
@@ -72,6 +73,7 @@ class Engine:
         self.writer = None
         self.use_ema_decay = use_ema_decay
         self.start_epoch = 0
+        self.lr_finder = lr_finder
         self.fixbase_epoch = 0
         self.iter_to_wait = 0
         self.best_metric = 0.0
@@ -636,13 +638,12 @@ class Engine:
                         lr_finder=lr_finder
                     )
                     if self.use_ema_decay and not lr_finder and not test_only:
-                        ema_mAP = self._evaluate_classification(
+                        ema_mAP = self._evaluate_multilabel_classification(
                             model=self.ema_model.module,
                             epoch=epoch,
                             data_loader=self.test_loader[dataset_name]['query'],
                             model_name='EMA model',
                             dataset_name=dataset_name,
-                            ranks=ranks,
                             lr_finder = lr_finder
                         )
                     cur_top1, cur_top5 = (cur_mAP, cur_mAP)

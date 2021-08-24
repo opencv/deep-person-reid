@@ -38,7 +38,7 @@ class ImageAMSoftmaxEngine(Engine):
 
     def __init__(self, datamanager, models, optimizers, reg_cfg, metric_cfg, schedulers=None, use_gpu=False, save_chkpt=True,
                  train_patience=10, early_stoping = False, lr_decay_factor = 1000, softmax_type='softmax', label_smooth=False,
-                 margin_type='cos', epsilon=0.1, aug_type=None, decay_power=3, alpha=1., size=(224, 224), max_soft=0.0,
+                 margin_type='cos', epsilon=0.1, aug_type=None, decay_power=3, alpha=1., size=(224, 224), lr_finder=None, max_soft=0.0,
                  reformulate=False, aug_prob=1., conf_penalty=False, pr_product=False, m=0.35, s=10, compute_s=False, end_s=None,
                  duration_s=None, skip_steps_s=None, enable_masks=False, adaptive_margins=False, class_weighting=False,
                  attr_cfg=None, base_num_classes=-1, symmetric_ce=False, mix_weight=1.0, enable_rsc=False, enable_sam=False,
@@ -56,6 +56,7 @@ class ImageAMSoftmaxEngine(Engine):
                                                    should_freeze_aux_models=should_freeze_aux_models,
                                                    nncf_metainfo=nncf_metainfo,
                                                    initial_lr=initial_lr,
+                                                   lr_finder=lr_finder,
                                                    use_ema_decay=use_ema_decay,
                                                    ema_decay=ema_decay)
 
@@ -215,8 +216,7 @@ class ImageAMSoftmaxEngine(Engine):
 
         model_names = self.get_model_names()
         num_models = len(model_names)
-
-        steps = [1,2] if self.enable_sam else [1]
+        steps = [1,2] if self.enable_sam and not self.lr_finder else [1]
         for step in steps:
             # if sam is enabled then statistics will be written each step, but will be saved only the second time
             # this is made just for convinience

@@ -1,6 +1,5 @@
 from __future__ import absolute_import, division, print_function
 import math
-from os import stat
 import random
 from collections import deque
 from os.path import exists, join
@@ -9,11 +8,12 @@ import cv2
 import numpy as np
 import torch
 import re
-from PIL import Image, ImageOps, ImageEnhance, ImageChops
+from PIL import Image, ImageOps, ImageEnhance, ImageDraw
 from torchvision.transforms import (ColorJitter, Compose, Normalize, Resize,
-                                    ToPILImage, ToTensor, InterpolationMode)
+                                    ToTensor, InterpolationMode)
 from torchvision.transforms import RandomCrop as TorchRandomCrop
 from torchvision.transforms import functional as F
+from randaugment import RandAugment
 
 from torchreid.utils.tools import read_image
 from ..data.datasets.image.lfw import FivePointsAligner
@@ -308,6 +308,20 @@ class RandomPatch(object):
         return img, mask
 
 
+class RandomAugment(RandAugment):
+    def __init__(self, p=1., **kwargs):
+        self.p = p
+        super().__init__()
+
+    def __call__(self, input_tuple):
+        if random.uniform(0, 1) > self.p:
+            return input_tuple
+
+        img, mask = input_tuple
+        img = super().__call__(img)
+
+        return img, mask
+
 class RandomColorJitter(ColorJitter):
     def __init__(self, p=0.5, brightness=0.2, contrast=0.15, saturation=0, hue=0, **kwargs):
         self.p = p
@@ -526,6 +540,43 @@ class CoarseDropout(object):
             image[y1:y2, x1:x2] = fill_value
 
         return Image.fromarray(image)
+
+class Cutout(object):
+    """Randomly mask out one or more patches from an image.
+    Args:
+        n_holes (int): Number of patches to cut out of each image.
+        length (int): The length (in pixels) of each square patch.
+    """
+    def __init__(self, cutout_factor=0.3, fill_color='random', p=0.5, **kwargs):
+        self.p = p
+        self.p = p
+        self.cutout_factor = cutout_factor
+        self.fill_color = fill_color
+
+    def __call__(self, input_tuple):
+        if random.uniform(0, 1) > self.p:
+            return input_tuple
+
+        img, img_mask = input_tuple
+        img_draw = ImageDraw.Draw(img)
+        h, w = img.size[0], img.size[1]
+        h_cutout = int(self.cutout_factor * h + 0.5)
+        w_cutout = int(self.cutout_factor * w + 0.5)
+        y_c = np.random.randint(h)
+        x_c = np.random.randint(w)
+
+        y1 = np.clip(y_c - h_cutout // 2, 0, h)
+        y2 = np.clip(y_c + h_cutout // 2, 0, h)
+        x1 = np.clip(x_c - w_cutout // 2, 0, w)
+        x2 = np.clip(x_c + w_cutout // 2, 0, w)
+        if self.fill_color == 'random':
+            fill_color = (random.randint(0, 255), random.randint(0, 255), random.randint(0, 255))
+        else:
+            assert isinstance(self.fill_color, (tuple, list))
+            fill_color = self.fill_color
+        img_draw.rectangle([x1, y1, x2, y2], fill=fill_color)
+
+        return img, img_mask
 
 class RandomGrid(object):
     """Random grid
@@ -1278,6 +1329,12 @@ def build_transforms(height, width, transforms=None, norm_mean=(0.485, 0.456, 0.
     if transforms.augmix.enable:
         print('+ AugMix')
         transform_tr += [augment_and_mix_transform(config_str=transforms.augmix.cfg_str, image_mean=norm_mean, grey=transforms.augmix.grey_imgs)]
+    if transforms.randaugment.enable:
+        print('+ RandAugment')
+        transform_tr += [RandomAugment()]
+    if transforms.cutout.enable:
+        print('+ Cutout')
+        transform_tr += [Cutout(**transforms.cutout)]
     if transforms.random_background_substitution.enable:
         aug_module = RandomBackgroundSubstitution(**transforms.random_background_substitution)
         if aug_module.enable:

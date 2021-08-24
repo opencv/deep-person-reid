@@ -367,6 +367,16 @@ def get_default_config():
     cfg.data.transforms.augmix.cfg_str = "augmix-m5-w3"
     cfg.data.transforms.augmix.grey_imgs = False
 
+    cfg.data.transforms.randaugment = CN()
+    cfg.data.transforms.randaugment.enable = False
+    cfg.data.transforms.randaugment.p = 1.
+
+    cfg.data.transforms.cutout = CN()
+    cfg.data.transforms.cutout.enable = False
+    cfg.data.transforms.cutout.p = 0.5
+    cfg.data.transforms.cutout.cutout_factor=0.3
+    cfg.data.transforms.cutout.fill_color='random'
+
     cfg.data.transforms.random_figures = CN()
     cfg.data.transforms.random_figures.enable = False
     cfg.data.transforms.random_figures.p = 0.5

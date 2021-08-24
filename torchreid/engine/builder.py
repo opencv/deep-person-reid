@@ -1,3 +1,4 @@
+from torchreid.optim import lr_finder
 from torchreid.engine import (ImageAMSoftmaxEngine, ImageContrastiveEngine,
                               ImageTripletEngine)
 
@@ -21,6 +22,7 @@ def build_engine(cfg, datamanager, model, optimizer, scheduler,
             schedulers=scheduler,
             use_gpu=cfg.use_gpu,
             save_chkpt = cfg.model.save_chkpt,
+            lr_finder = cfg.lr_finder.enable,
             train_patience = cfg.train.train_patience,
             early_stoping = cfg.train.early_stoping,
             lr_decay_factor = cfg.train.lr_decay_factor,
