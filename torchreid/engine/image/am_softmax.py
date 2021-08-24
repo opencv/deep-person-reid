@@ -28,7 +28,7 @@ import torch.nn.functional as F
 from torchreid import metrics
 from torchreid.engine import Engine
 from torchreid.utils import get_model_attr
-from torchreid.losses import (AMSoftmaxLoss, CrossEntropyLoss, MetricLosses, AsymmetricLoss,
+from torchreid.losses import (AMSoftmaxLoss, CrossEntropyLoss, MetricLosses, AsymmetricLoss, AsymmetricAMSoftmax,
                               get_regularizer, sample_mask)
 from torchreid.optim import SAM
 
@@ -148,6 +148,14 @@ class ImageAMSoftmaxEngine(Engine):
                     gamma_neg=asl_gamma_neg,
                     gamma_pos=asl_gamma_pos,
                     probability_margin=asl_p_m,
+                ))
+
+            elif softmax_type == 'am_asl':
+                self.main_losses.append(AsymmetricAMSoftmax(
+                    gamma_neg=asl_gamma_neg,
+                    gamma_pos=asl_gamma_pos,
+                    m=m,
+                    s=scale_factor * s,
                 ))
 
             if self.enable_metric_losses:

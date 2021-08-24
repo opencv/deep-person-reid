@@ -352,12 +352,12 @@ class EfficientNet(ModelInterface):
         self.output = nn.Sequential()
         if dropout_cls:
             self.output.add_module("dropout", Dropout(**dropout_cls))
-        if self.loss == 'softmax':
+        if self.loss in ['softmax', 'asl']:
             self.output.add_module("fc", nn.Linear(
                 in_features=in_channels,
                 out_features=num_classes))
         else:
-            assert self.loss == 'am_softmax'
+            assert self.loss in ['am_softmax', 'am_asl']
             self.output.add_module("asl", AngleSimpleLinear(
                 in_features=in_channels,
                 out_features=num_classes))
@@ -388,7 +388,7 @@ class EfficientNet(ModelInterface):
 
         if get_embeddings:
             out_data = [logits, glob_features.view(x.shape[0], -1)]
-        elif self.loss in ['softmax', 'am_softmax']:
+        elif self.loss in ['softmax', 'am_softmax', 'asl', 'am_asl']:
             if self.lr_finder.enable and self.lr_finder.mode == 'automatic':
                 out_data = logits
             else:

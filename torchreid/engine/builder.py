@@ -12,7 +12,7 @@ def build_engine(cfg, datamanager, model, optimizer, scheduler,
             raise NotImplementedError('Freezing of aux models or NNCF compression are supported only for '
                                       'softmax and am_softmax losses for data.type = image')
     initial_lr = initial_lr if initial_lr else cfg.train.lr
-    if cfg.loss.name in ['softmax', 'am_softmax', 'asl']:
+    if cfg.loss.name in ['softmax', 'am_softmax', 'asl', 'am_asl']:
         engine = ImageAMSoftmaxEngine(
             datamanager,
             models=model,
@@ -60,7 +60,7 @@ def build_engine(cfg, datamanager, model, optimizer, scheduler,
             ema_decay=cfg.train.ema.ema_decay,
             asl_gamma_neg=cfg.loss.asl.gamma_neg,
             asl_gamma_pos=cfg.loss.asl.gamma_pos,
-            asl_p_m=cfg.loss.asl.p_m
+            asl_p_m=cfg.loss.asl.p_m,
         )
     elif cfg.loss.name == 'contrastive':
         engine = ImageContrastiveEngine(

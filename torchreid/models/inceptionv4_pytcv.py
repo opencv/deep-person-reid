@@ -645,7 +645,7 @@ class InceptionV4(ModelInterface):
                 in_features=self.feature_dim,
                 out_features=num_classes))
         else:
-            assert self.loss == 'am_softmax'
+            assert self.loss in ['am_softmax', 'am_asl']
             self.output.add_module("asl", AngleSimpleLinear(
                 in_features=self.feature_dim,
                 out_features=num_classes))
@@ -688,7 +688,7 @@ class InceptionV4(ModelInterface):
 
         if get_embeddings:
             out_data = [logits, glob_features]
-        elif self.loss in ['softmax', 'am_softmax', 'asl']:
+        elif self.loss in ['softmax', 'am_softmax', 'asl', 'am-asl']:
             if self.lr_finder.enable and self.lr_finder.lr_find_mode == 'automatic':
                 out_data = logits
             else:
