@@ -115,10 +115,8 @@ class MobileNetV3Base(ModelInterface):
                 input_size=(224, 224),
                 dropout_cls = None,
                 pooling_type='avg',
-                feature_dim=1280,
                 IN_first=False,
                 self_challenging_cfg=False,
-                lr_finder=None,
                 **kwargs):
 
         super().__init__(**kwargs)
@@ -129,8 +127,7 @@ class MobileNetV3Base(ModelInterface):
         self.self_challenging_cfg = self_challenging_cfg
         self.width_mult = width_mult
         self.dropout_cls = dropout_cls
-        self.lr_finder = lr_finder
-        self.feature_dim = feature_dim
+
     def infer_head(self, x, skip_pool=False):
         raise NotImplementedError
 
@@ -164,22 +161,13 @@ class MobileNetV3Base(ModelInterface):
 
         if get_embeddings:
             out_data = [logits, glob_features]
-<<<<<<< HEAD
         elif self.loss in ['softmax', 'am_softmax', 'asl', 'am_binary']:
-=======
-        elif self.loss in ['softmax', 'am_softmax', 'asl', 'am-asl']:
->>>>>>> Added initial implementation asl-amsoftmax
-            if self.lr_finder.enable and self.lr_finder.mode == 'fast_ai':
-                out_data = logits
-            else:
                 out_data = [logits]
         elif self.loss in ['triplet']:
             out_data = [logits, glob_features]
         else:
             raise KeyError("Unsupported loss: {}".format(self.loss))
 
-        if self.lr_finder.enable and self.lr_finder.mode == 'fast_ai':
-            return out_data
         return tuple(out_data)
 
 
@@ -194,6 +182,7 @@ class MobileNetV3(MobileNetV3Base):
         # setting of inverted residual blocks
         self.cfgs = cfgs
         assert mode in ['large', 'small']
+        # features before GAP
         # building first layer
         input_channel = make_divisible(16 * self.width_mult, 8)
         stride = 1 if self.in_size[0] < 100 else 2
@@ -210,6 +199,7 @@ class MobileNetV3(MobileNetV3Base):
             layers.append(block(input_channel, exp_size, output_channel, k, s, use_se, use_hs))
             input_channel = output_channel
         self.features = nn.Sequential(*layers)
+        self.num_features = exp_size
         # building last several layers
         self.conv = conv_1x1_bn(input_channel, exp_size, self.loss)
         output_channel = {'large': 1280, 'small': 1024}
@@ -217,24 +207,20 @@ class MobileNetV3(MobileNetV3Base):
 
         if self.loss == 'softmax' or self.loss == 'asl':
             self.classifier = nn.Sequential(
-                nn.Linear(exp_size, self.feature_dim),
-                nn.BatchNorm1d(self.feature_dim),
+                nn.Linear(exp_size, output_channel),
+                nn.BatchNorm1d(output_channel),
                 HSwish(),
                 Dropout(**self.dropout_cls),
-                nn.Linear(self.feature_dim, self.num_classes),
+                nn.Linear(output_channel, self.num_classes),
             )
         else:
-<<<<<<< HEAD
             assert self.loss in ['am_softmax', 'am_binary']
-=======
-            assert self.loss in ['am_softmax', 'am_asl']
->>>>>>> Added initial implementation asl-amsoftmax
             self.classifier = nn.Sequential(
-                nn.Linear(exp_size, self.feature_dim),
-                nn.BatchNorm1d(self.feature_dim),
+                nn.Linear(exp_size, output_channel),
+                nn.BatchNorm1d(output_channel),
                 nn.PReLU(),
                 Dropout(**self.dropout_cls),
-                AngleSimpleLinear(self.feature_dim, self.num_classes),
+                AngleSimpleLinear(output_channel, self.num_classes),
             )
 
         self._initialize_weights()
@@ -278,6 +264,7 @@ class MobileNetV3LargeTimm(MobileNetV3Base):
                                         pretrained=pretrained,
                                         num_classes=self.num_classes)
         self.dropout = Dropout(**self.dropout_cls)
+        self.num_features = self.model.conv_head.in_channels
         assert self.loss in ['softmax', 'asl'], "mobilenetv3_large_100_miil_in21k supports only softmax aor ASL losses"
 
     def extract_features(self, x):
@@ -299,7 +286,6 @@ class MobileNetV3LargeTimm(MobileNetV3Base):
 
 def init_pretrained_weights(model, key='', **kwargs):
     """Initializes model with pretrained weights.
-
     Layers that don't match with pretrained layers in name or size are kept unchanged.
     """
     import os

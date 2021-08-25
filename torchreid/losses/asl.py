@@ -53,10 +53,11 @@ class AsymmetricLoss(nn.Module):
         return -loss.sum()
 
 class AsymmetricAMSoftmax(nn.Module):
-    def __init__(self, gamma_neg=4, gamma_pos=1, m=0.35, k=0.8, t=1, s=30, eps=1e-8):
+    def __init__(self, gamma_neg=4, gamma_pos=1, m=0.35, k=0.8, t=1, s=30, eps=1e-8, sym_adjustment=False):
         super().__init__()
         self.gamma_neg = gamma_neg
         self.gamma_pos = gamma_pos
+        self.sym_adjustment = sym_adjustment
         self.eps = eps
         self.m = m
         self.t = t
@@ -81,8 +82,8 @@ class AsymmetricAMSoftmax(nn.Module):
         # self.k = (K - 1) / K # balance loss
         if self.sym_adjustment:
             cos_theta = self.sym_adjust(cos_theta)
-        Lpos = (self.k / self.s) * targets * torch.log(1 + torch.exp(-self.s * (cos_theta - self.class_margin)))
-        Lneg = (1 - self.k)/self.s * (1 - targets) * torch.log(1 + torch.exp(self.s * (cos_theta + self.class_margin)))
+        Lpos = (self.k / self.s) * targets * torch.log(1 + torch.exp(-self.s * (cos_theta - self.m)))
+        Lneg = (1 - self.k)/self.s * (1 - targets) * torch.log(1 + torch.exp(self.s * (cos_theta + self.m)))
         loss = Lpos + Lneg
 
         # TO DO combine assym loss with AMSoftmax
