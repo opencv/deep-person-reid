@@ -60,7 +60,7 @@ class ImageAMSoftmaxEngine(Engine):
                                                    use_ema_decay=use_ema_decay,
                                                    ema_decay=ema_decay)
 
-        assert softmax_type in ['softmax', 'am', 'asl']
+        assert softmax_type in ['softmax', 'am', 'asl', 'am_asl']
         assert s > 0.0
         if softmax_type == 'am':
             assert m >= 0.0

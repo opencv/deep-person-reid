@@ -164,7 +164,7 @@ class MobileNetV3Base(ModelInterface):
 
         if get_embeddings:
             out_data = [logits, glob_features]
-        elif self.loss in ['softmax', 'am_softmax', 'asl', 'am-asl']:
+        elif self.loss in ['softmax', 'am_softmax', 'asl', 'am_asl']:
             if self.lr_finder.enable and self.lr_finder.mode == 'fast_ai':
                 out_data = logits
             else:

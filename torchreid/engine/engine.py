@@ -11,8 +11,9 @@ import optuna
 import numpy as np
 import torch
 from torch.nn import functional as F
+from torch.optim.lr_scheduler import OneCycleLR
 
-from torchreid.optim import ReduceLROnPlateauV2, WarmupScheduler
+from torchreid.optim import ReduceLROnPlateauV2, WarmupScheduler, CosineAnnealingCycleRestart
 from torchreid import metrics
 from torchreid.losses import DeepSupervision
 from torchreid.utils import (AverageMeter, MetricMeter, get_model_attr,
@@ -124,6 +125,7 @@ class Engine:
         self.main_model_name = self.get_model_names()[0]
         assert initial_lr is not None
         self.lb_lr = initial_lr / lr_decay_factor
+        self.per_batch_annealing = isinstance(self.scheds[self.main_model_name], (CosineAnnealingCycleRestart, OneCycleLR))
 
     def _should_freeze_aux_models(self, epoch):
         if not self.should_freeze_aux_models:
@@ -555,8 +557,10 @@ class Engine:
                 break
             if not lr_finder and self.use_ema_decay:
                 self.ema_model.update(self.models[self.main_model_name])
+            if self.per_batch_annealing:
+                self.update_lr()
 
-        if not lr_finder:
+        if not lr_finder and not self.per_batch_annealing:
             self.update_lr(output_avg_metric = losses.meters['loss'].avg)
 
     def forward_backward(self, data):

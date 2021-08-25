@@ -4,7 +4,7 @@ import math
 from torch import optim
 from torch.optim.lr_scheduler import _LRScheduler
 
-AVAI_SCH = {'single_step', 'multi_step', 'cosine', 'warmup', 'cosine_cycle', 'reduce_on_plateau'}
+AVAI_SCH = {'single_step', 'multi_step', 'cosine', 'warmup', 'cosine_cycle', 'reduce_on_plateau', 'onecycle'}
 
 def build_lr_scheduler(optimizer, lr_scheduler, base_scheduler, **kwargs):
     if lr_scheduler == 'warmup':
@@ -79,6 +79,10 @@ def _build_scheduler(optimizer,
     elif lr_scheduler == 'cosine_cycle':
         scheduler = CosineAnnealingCycleRestart(optimizer, first_cycle_steps=first_cycle_steps, cycle_mult=cycle_mult,
         max_lr=max_lr, min_lr=min_lr, warmup_steps=warmup, gamma=gamma)
+
+    elif lr_scheduler == 'onecycle':
+        scheduler = optim.lr_scheduler.OneCycleLR(optimizer, max_lr=max_lr, steps_per_epoch=first_cycle_steps,
+                                                        epochs=int(max_epoch), pct_start=0.2)
 
     elif lr_scheduler == 'reduce_on_plateau':
         epoch_treshold = max(int(max_epoch * 0.75) - warmup, 1) # 75% of the training - warmup epochs
