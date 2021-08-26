@@ -148,12 +148,9 @@ def get_default_config():
     cfg.train.ema = CN()
     cfg.train.ema.enable = False
     cfg.train.ema.ema_decay = 0.9999
-<<<<<<< HEAD
     cfg.train.sam = CN()
     cfg.train.sam.rho = 0.05
 
-=======
->>>>>>> added new EMA, fix dataset
 
     # optimizer
     cfg.sgd = CN()
