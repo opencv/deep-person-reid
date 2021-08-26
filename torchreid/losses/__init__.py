@@ -1,7 +1,7 @@
 from __future__ import absolute_import, division, print_function
 
 from .am_softmax import AMSoftmaxLoss, AngleSimpleLinear
-from .asl import AsymmetricLoss, AsymmetricAMSoftmax
+from .asl import AsymmetricLoss, AMBinaryLoss
 from .cross_entropy_loss import CrossEntropyLoss, PseudoCrossEntropyLoss
 from .entropy import MaxEntropyLoss, MinEntropyLoss, entropy
 from .fmix import FMixBase, sample_mask

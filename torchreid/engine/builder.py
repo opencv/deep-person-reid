@@ -1,6 +1,6 @@
 from torchreid.optim import lr_finder
 from torchreid.engine import (ImageAMSoftmaxEngine, ImageContrastiveEngine,
-                              ImageTripletEngine)
+                              ImageTripletEngine, MultilabelEngine)
 
 
 def build_engine(cfg, datamanager, model, optimizer, scheduler,

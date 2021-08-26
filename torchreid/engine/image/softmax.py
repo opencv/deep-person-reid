@@ -3,36 +3,38 @@ from __future__ import absolute_import, division, print_function
 import torch
 
 from torchreid import metrics
-from torchreid.losses import CrossEntropyLoss
+from torchreid.losses import AsymmetricLoss, AMBinaryLoss
 from ..engine import Engine
 
 
-class ImageSoftmaxEngine(Engine):
-    r"""Softmax-loss engine for image-reid.
+class MultilabelEngine(Engine):
+    r"""Multilabel classification engine. It supports ASL, BCE and Angular margin loss with binary classification."""
 
-    Args:
-        datamanager (DataManager): an instance of ``torchreid.data.ImageDataManager``
-            or ``torchreid.data.VideoDataManager``.
-        model (nn.Module): model instance.
-        optimizer (Optimizer): an Optimizer.
-        scheduler (LRScheduler, optional): if None, no learning rate decay will be performed.
-        use_gpu (bool, optional): use gpu. Default is True.
-        label_smooth (bool, optional): use label smoothing regularizer. Default is True.
-    """
+    def __init__(self, datamanager, models, optimizers, reg_cfg, metric_cfg, schedulers=None, use_gpu=False, save_chkpt=True,
+                 train_patience=10, early_stoping = False, lr_decay_factor = 1000, softmax_type='softmax', label_smooth=False,
+                 margin_type='cos', epsilon=0.1, aug_type=None, decay_power=3, alpha=1., size=(224, 224), lr_finder=None, max_soft=0.0,
+                 reformulate=False, aug_prob=1., conf_penalty=False, pr_product=False, m=0.35, s=10, compute_s=False, end_s=None,
+                 duration_s=None, skip_steps_s=None, enable_masks=False, adaptive_margins=False, class_weighting=False,
+                 attr_cfg=None, base_num_classes=-1, symmetric_ce=False, mix_weight=1.0, enable_rsc=False, enable_sam=False,
+                 should_freeze_aux_models=False, nncf_metainfo=None, initial_lr=None, use_ema_decay=False, ema_decay=0.999,
+                 asl_gamma_pos=0.0, asl_gamma_neg=4.0, asl_p_m=0.05):
+        super().__init__(datamanager,
+                        models=models,
+                        optimizers=optimizers,
+                        schedulers=schedulers,
+                        use_gpu=use_gpu,
+                        save_chkpt=save_chkpt,
+                        train_patience=train_patience,
+                        lr_decay_factor=lr_decay_factor,
+                        early_stoping=early_stoping,
+                        should_freeze_aux_models=should_freeze_aux_models,
+                        nncf_metainfo=nncf_metainfo,
+                        initial_lr=initial_lr,
+                        lr_finder=lr_finder,
+                        use_ema_decay=use_ema_decay,
+                        ema_decay=ema_decay)
 
-    def __init__(
-        self,
-        datamanager,
-        model,
-        optimizer,
-        scheduler=None,
-        use_gpu=True,
-        label_smooth=True,
-        conf_penalty=0.0
-    ):
-        super(ImageSoftmaxEngine, self).__init__(datamanager, model, optimizer, scheduler, use_gpu)
-
-        self.main_real_loss = CrossEntropyLoss(
+        self.main_loss = CrossEntropyLoss(
             use_gpu=self.use_gpu,
             label_smooth=label_smooth,
             conf_penalty=conf_penalty
