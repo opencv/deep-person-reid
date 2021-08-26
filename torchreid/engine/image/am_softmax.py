@@ -28,7 +28,7 @@ import torch.nn.functional as F
 from torchreid import metrics
 from torchreid.engine import Engine
 from torchreid.utils import get_model_attr
-from torchreid.losses import (AMSoftmaxLoss, CrossEntropyLoss, MetricLosses, AsymmetricLoss, AsymmetricAMSoftmax,
+from torchreid.losses import (AMSoftmaxLoss, CrossEntropyLoss, MetricLosses, AsymmetricLoss, AMBinaryLoss,
                               get_regularizer, sample_mask)
 from torchreid.optim import SAM
 
@@ -82,7 +82,6 @@ class ImageAMSoftmaxEngine(Engine):
         self.max_soft = max_soft
         self.reformulate = reformulate
 
-        num_batches = len(self.train_loader)
         num_classes = self.datamanager.num_train_pids
         if not isinstance(num_classes, (list, tuple)):
             num_classes = [num_classes]
@@ -135,8 +134,8 @@ class ImageAMSoftmaxEngine(Engine):
                     m=m,
                     s=scale_factor * s,
                     end_s=scale_factor * end_s if self._valid(end_s) else None,
-                    duration_s=duration_s * num_batches if self._valid(duration_s) else None,
-                    skip_steps_s=skip_steps_s * num_batches if self._valid(skip_steps_s) else None,
+                    duration_s=duration_s * self.num_batches if self._valid(duration_s) else None,
+                    skip_steps_s=skip_steps_s * self.num_batches if self._valid(skip_steps_s) else None,
                     pr_product=pr_product,
                     symmetric_ce=symmetric_ce,
                     class_counts=trg_class_counts,
@@ -152,7 +151,7 @@ class ImageAMSoftmaxEngine(Engine):
                 ))
 
             elif softmax_type == 'am_asl':
-                self.main_losses.append(AsymmetricAMSoftmax(
+                self.main_losses.append(AMBinaryLoss(
                     gamma_neg=asl_gamma_neg,
                     gamma_pos=asl_gamma_pos,
                     m=m,
@@ -188,8 +187,8 @@ class ImageAMSoftmaxEngine(Engine):
                     m=attr_cfg.m,
                     s=attr_cfg.s,
                     end_s=attr_cfg.end_s if self._valid(attr_cfg.end_s) else None,
-                    duration_s=attr_cfg.duration_s * num_batches if self._valid(attr_cfg.duration_s) else None,
-                    skip_steps_s=attr_cfg.skip_steps_s * num_batches if self._valid(attr_cfg.skip_steps_s) else None,
+                    duration_s=attr_cfg.duration_s * self.num_batches if self._valid(attr_cfg.duration_s) else None,
+                    skip_steps_s=attr_cfg.skip_steps_s * self.num_batches if self._valid(attr_cfg.skip_steps_s) else None,
                     pr_product=attr_cfg.pr_product
                 )
 
