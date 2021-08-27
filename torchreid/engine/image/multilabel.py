@@ -206,10 +206,8 @@ class MultilabelEngine(Engine):
     def exit_on_plateau_and_choose_best(self, top1, smooth_top1):
         '''
         The function returns a pair (should_exit, is_candidate_for_best).
-
         The function sets this checkpoint as a candidate for best if either it is the first checkpoint
         for this LR or this checkpoint is better then the previous best.
-
         The function sets should_exit = True if the overfitting is observed or the metric
         doesn't improves for a predetermined number of epochs.
         '''
