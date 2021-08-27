@@ -1,16 +1,11 @@
 """
  MIT License
-
  Copyright (c) 2018 Kaiyang Zhou
-
  Copyright (c) 2019 Intel Corporation
-
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
  You may obtain a copy of the License at
-
       http://www.apache.org/licenses/LICENSE-2.0
-
  Unless required by applicable law or agreed to in writing, software
  distributed under the License is distributed on an "AS IS" BASIS,
  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -35,6 +30,7 @@ from torchreid.optim import SAM
 class ImageAMSoftmaxEngine(Engine):
     r"""AM-Softmax-loss engine for image-reid.
     """
+
     def __init__(self, datamanager, models, optimizers, reg_cfg, metric_cfg, schedulers, use_gpu, save_chkpt,
                  train_patience, early_stoping, lr_decay_factor, loss_name, label_smooth,
                  margin_type, aug_type, decay_power, alpha, size, lr_finder, max_soft,
@@ -245,16 +241,10 @@ class ImageAMSoftmaxEngine(Engine):
                         continue
 
                     with torch.no_grad():
-                        if self.loss_name in ['asl', 'am_asl']:
-                            trg_probs = torch.sigmoid(torch.stack(out_logits[trg_id])).mean(dim=0)
-                        else:
-                            trg_probs = torch.softmax(torch.stack(out_logits[trg_id]), dim=2).mean(dim=0)
+                        trg_probs = torch.softmax(torch.stack(out_logits[trg_id]), dim=2).mean(dim=0)
 
                     for model_id, logits in enumerate(out_logits[trg_id]):
-                        if self.loss_name in ['asl', 'am_asl']:
-                            log_probs = F.logsigmoid(logits)
-                        else:
-                            log_probs = torch.log_softmax(logits, dim=1)
+                        log_probs = torch.log_softmax(logits, dim=1)
                         m_loss = (trg_probs * log_probs).sum(dim=1).mean().neg()
 
                         mutual_loss += m_loss
@@ -515,10 +505,8 @@ class ImageAMSoftmaxEngine(Engine):
     def exit_on_plateau_and_choose_best(self, top1, smooth_top1):
         '''
         The function returns a pair (should_exit, is_candidate_for_best).
-
         The function sets this checkpoint as a candidate for best if either it is the first checkpoint
         for this LR or this checkpoint is better then the previous best.
-
         The function sets should_exit = True if the LR is the minimal allowed
         LR (i.e. self.lb_lr) and the best checkpoint is not changed for self.train_patience
         epochs.
