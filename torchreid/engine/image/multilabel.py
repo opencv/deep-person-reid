@@ -154,10 +154,7 @@ class MultilabelEngine(Engine):
             trg_logits = all_logits[trg_id][trg_mask]
             main_loss = self.main_losses[trg_id](trg_logits, trg_obj_ids, aug_index=self.aug_index,
                                                 lam=self.lam, iteration=n_iter, scale=self.scales[model_name])
-            if trg_logits.shape[-1] == trg_obj_ids.shape[-1]:
-                avg_acc += metrics.accuracy_multilabel(trg_logits, trg_obj_ids).item()
-            else:
-                avg_acc += metrics.accuracy(trg_logits, trg_obj_ids)[0].item()
+            avg_acc += metrics.accuracy_multilabel(trg_logits, trg_obj_ids).item()
             loss_summary['main_{}/{}'.format(trg_id, model_name)] = main_loss.item()
 
             scaled_trg_logits = self.main_losses[trg_id].get_last_scale() * trg_logits

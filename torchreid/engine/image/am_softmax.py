@@ -28,7 +28,7 @@ import torch.nn.functional as F
 from torchreid import metrics
 from torchreid.engine import Engine
 from torchreid.utils import get_model_attr
-from torchreid.losses import (AMSoftmaxLoss, CrossEntropyLoss, MetricLosses, AsymmetricLoss, AMBinaryLoss,
+from torchreid.losses import (AMSoftmaxLoss, CrossEntropyLoss, MetricLosses,
                               get_regularizer, sample_mask)
 from torchreid.optim import SAM
 
@@ -42,8 +42,7 @@ class ImageAMSoftmaxEngine(Engine):
                  reformulate=False, aug_prob=1., conf_penalty=False, pr_product=False, m=0.35, s=10, compute_s=False, end_s=None,
                  duration_s=None, skip_steps_s=None, enable_masks=False, adaptive_margins=False, class_weighting=False,
                  attr_cfg=None, base_num_classes=-1, symmetric_ce=False, mix_weight=1.0, enable_rsc=False, enable_sam=False,
-                 should_freeze_aux_models=False, nncf_metainfo=None, initial_lr=None, use_ema_decay=False, ema_decay=0.999,
-                 asl_gamma_pos=0.0, asl_gamma_neg=4.0, asl_p_m=0.05):
+                 should_freeze_aux_models=False, nncf_metainfo=None, initial_lr=None, use_ema_decay=False, ema_decay=0.999):
         super(ImageAMSoftmaxEngine, self).__init__(datamanager,
                                                    models=models,
                                                    optimizers=optimizers,
@@ -60,7 +59,7 @@ class ImageAMSoftmaxEngine(Engine):
                                                    use_ema_decay=use_ema_decay,
                                                    ema_decay=ema_decay)
 
-        assert softmax_type in ['softmax', 'am', 'asl', 'am_asl']
+        assert softmax_type in ['softmax', 'am'']
         self.loss_name = softmax_type
         assert s > 0.0
         if softmax_type == 'am':
@@ -141,21 +140,6 @@ class ImageAMSoftmaxEngine(Engine):
                     class_counts=trg_class_counts,
                     adaptive_margins=adaptive_margins,
                     class_weighting=class_weighting
-                ))
-
-            elif softmax_type == 'asl':
-                self.main_losses.append(AsymmetricLoss(
-                    gamma_neg=asl_gamma_neg,
-                    gamma_pos=asl_gamma_pos,
-                    probability_margin=asl_p_m,
-                ))
-
-            elif softmax_type == 'am_asl':
-                self.main_losses.append(AMBinaryLoss(
-                    gamma_neg=asl_gamma_neg,
-                    gamma_pos=asl_gamma_pos,
-                    m=m,
-                    s=scale_factor * s,
                 ))
 
             if self.enable_metric_losses:
@@ -319,10 +303,7 @@ class ImageAMSoftmaxEngine(Engine):
             trg_logits = all_logits[trg_id][trg_mask]
             main_loss = self.main_losses[trg_id](trg_logits, trg_obj_ids, aug_index=self.aug_index,
                                                 lam=self.lam, iteration=n_iter, scale=self.scales[model_name])
-            if trg_logits.shape[-1] == trg_obj_ids.shape[-1]:
-                avg_acc += metrics.accuracy_multilabel(trg_logits, trg_obj_ids).item()
-            else:
-                avg_acc += metrics.accuracy(trg_logits, trg_obj_ids)[0].item()
+            avg_acc += metrics.accuracy(trg_logits, trg_obj_ids)[0].item()
             loss_summary['main_{}/{}'.format(trg_id, model_name)] = main_loss.item()
 
             scaled_trg_logits = self.main_losses[trg_id].get_last_scale() * trg_logits
