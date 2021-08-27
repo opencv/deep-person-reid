@@ -11,11 +11,11 @@ import torch.nn.functional as F
 class MultilabelEngine(Engine):
     r"""Multilabel classification engine. It supports ASL, BCE and Angular margin loss with binary classification."""
 
-    def __init__(self, datamanager, models, optimizers, schedulers=None, use_gpu=False, save_chkpt=True,
-                 train_patience=10, early_stoping = False, lr_decay_factor = 1000, loss_name='softmax', label_smooth=False,
-                 lr_finder=None, m=0.35, s=10, sym_adjustment=False, auto_balance=False, amb_k = 0.2, amb_t=1.,
-                 enable_sam=False, should_freeze_aux_models=False, nncf_metainfo=None, initial_lr=None,
-                 use_ema_decay=False, ema_decay=0.999, asl_gamma_pos=0.0, asl_gamma_neg=4.0, asl_p_m=0.05):
+    def __init__(self, datamanager, models, optimizers, schedulers, use_gpu, save_chkpt,
+                 train_patience, early_stoping, lr_decay_factor, loss_name, label_smooth,
+                 lr_finder, m, s, sym_adjustment, auto_balance, amb_k, amb_t,
+                 enable_sam, should_freeze_aux_models, nncf_metainfo, initial_lr,
+                 use_ema_decay, ema_decay, asl_gamma_pos, asl_gamma_neg, asl_p_m, **kwargs):
 
         super().__init__(datamanager,
                         models=models,

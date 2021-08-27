@@ -36,13 +36,13 @@ class ImageAMSoftmaxEngine(Engine):
     r"""AM-Softmax-loss engine for image-reid.
     """
 
-    def __init__(self, datamanager, models, optimizers, reg_cfg, metric_cfg, schedulers=None, use_gpu=False, save_chkpt=True,
-                 train_patience=10, early_stoping = False, lr_decay_factor = 1000, softmax_type='softmax', label_smooth=False,
-                 margin_type='cos', epsilon=0.1, aug_type=None, decay_power=3, alpha=1., size=(224, 224), lr_finder=None, max_soft=0.0,
-                 reformulate=False, aug_prob=1., conf_penalty=False, pr_product=False, m=0.35, s=10, compute_s=False, end_s=None,
-                 duration_s=None, skip_steps_s=None, enable_masks=False, adaptive_margins=False, class_weighting=False,
-                 attr_cfg=None, base_num_classes=-1, symmetric_ce=False, mix_weight=1.0, enable_rsc=False, enable_sam=False,
-                 should_freeze_aux_models=False, nncf_metainfo=None, initial_lr=None, use_ema_decay=False, ema_decay=0.999):
+    def __init__(self, datamanager, models, optimizers, reg_cfg, metric_cfg, schedulers, use_gpu, save_chkpt,
+                 train_patience, early_stoping, lr_decay_factor, softmax_type, label_smooth,
+                 margin_type, epsilon, aug_type, decay_power, alpha, size, lr_finder, max_soft,
+                 reformulate, aug_prob, conf_penalty, pr_product, m, s, compute_s, end_s,
+                 duration_s, skip_steps_s, enable_masks, adaptive_margins, class_weighting,
+                 attr_cfg, base_num_classes, symmetric_ce, mix_weight, enable_rsc, enable_sam,
+                 should_freeze_aux_models, nncf_metainfo, initial_lr, use_ema_decay, ema_decay, **kwargs):
         super(ImageAMSoftmaxEngine, self).__init__(datamanager,
                                                    models=models,
                                                    optimizers=optimizers,
