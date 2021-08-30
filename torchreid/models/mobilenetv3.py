@@ -164,7 +164,7 @@ class MobileNetV3Base(ModelInterface):
 
         if get_embeddings:
             out_data = [logits, glob_features]
-        elif self.loss in ['softmax', 'am_softmax', 'asl', 'am_asl']:
+        elif self.loss in ['softmax', 'am_softmax', 'asl', 'am_binary']:
             if self.lr_finder.enable and self.lr_finder.mode == 'fast_ai':
                 out_data = logits
             else:
@@ -220,7 +220,7 @@ class MobileNetV3(MobileNetV3Base):
                 nn.Linear(self.feature_dim, self.num_classes),
             )
         else:
-            assert self.loss in ['am_softmax', 'am_asl']
+            assert self.loss in ['am_softmax', 'am_binary']
             self.classifier = nn.Sequential(
                 nn.Linear(exp_size, self.feature_dim),
                 nn.BatchNorm1d(self.feature_dim),

@@ -188,8 +188,13 @@ def get_default_config():
     cfg.loss.softmax.symmetric_ce = False
     cfg.loss.asl = CN()
     cfg.loss.asl.gamma_pos = 0.
-    cfg.loss.asl.gamma_neg = 4.
+    cfg.loss.asl.gamma_neg = 0.
     cfg.loss.asl.p_m = 0.05
+    cfg.loss.am_binary = CN()
+    cfg.loss.am_binary.sym_adjustment = False
+    cfg.loss.am_binary.auto_balance = False
+    cfg.loss.am_binary.amb_k = 0.8
+    cfg.loss.am_binary.amb_t = 1.
     cfg.loss.triplet = CN()
     cfg.loss.triplet.margin = 0.3  # distance margin
     cfg.loss.triplet.weight_t = 1.  # weight to balance hard triplet loss

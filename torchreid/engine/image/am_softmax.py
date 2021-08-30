@@ -37,7 +37,7 @@ class ImageAMSoftmaxEngine(Engine):
     """
 
     def __init__(self, datamanager, models, optimizers, reg_cfg, metric_cfg, schedulers, use_gpu, save_chkpt,
-                 train_patience, early_stoping, lr_decay_factor, softmax_type, label_smooth,
+                 train_patience, early_stoping, lr_decay_factor, loss_name, label_smooth,
                  margin_type, epsilon, aug_type, decay_power, alpha, size, lr_finder, max_soft,
                  reformulate, aug_prob, conf_penalty, pr_product, m, s, compute_s, end_s,
                  duration_s, skip_steps_s, enable_masks, adaptive_margins, class_weighting,
@@ -59,10 +59,10 @@ class ImageAMSoftmaxEngine(Engine):
                                                    use_ema_decay=use_ema_decay,
                                                    ema_decay=ema_decay)
 
-        assert softmax_type in ['softmax', 'am'']
-        self.loss_name = softmax_type
+        assert loss_name in ['softmax', 'am']
+        self.loss_name = loss_name
         assert s > 0.0
-        if softmax_type == 'am':
+        if loss_name == 'am':
             assert m >= 0.0
 
         self.regularizer = get_regularizer(reg_cfg)
@@ -110,7 +110,7 @@ class ImageAMSoftmaxEngine(Engine):
             else:
                 scale_factor = np.log(trg_num_classes - 1) / np.log(base_num_classes - 1)
 
-            if softmax_type == 'softmax':
+            if loss_name == 'softmax':
                 self.main_losses.append(CrossEntropyLoss(
                     use_gpu=self.use_gpu,
                     label_smooth=label_smooth,
@@ -119,7 +119,7 @@ class ImageAMSoftmaxEngine(Engine):
                     conf_penalty=conf_penalty,
                     scale=scale_factor * s
                 ))
-            elif softmax_type == 'am':
+            elif loss_name == 'am':
                 trg_class_counts = datamanager.data_counts[trg_id]
                 assert len(trg_class_counts) == trg_num_classes
 

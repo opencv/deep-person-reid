@@ -357,7 +357,7 @@ class EfficientNet(ModelInterface):
                 in_features=in_channels,
                 out_features=num_classes))
         else:
-            assert self.loss in ['am_softmax', 'am_asl']
+            assert self.loss in ['am_softmax', 'am_binary']
             self.output.add_module("asl", AngleSimpleLinear(
                 in_features=in_channels,
                 out_features=num_classes))
@@ -388,7 +388,7 @@ class EfficientNet(ModelInterface):
 
         if get_embeddings:
             out_data = [logits, glob_features.view(x.shape[0], -1)]
-        elif self.loss in ['softmax', 'am_softmax', 'asl', 'am_asl']:
+        elif self.loss in ['softmax', 'am_softmax', 'asl', 'am_binary']:
             if self.lr_finder.enable and self.lr_finder.mode == 'automatic':
                 out_data = logits
             else:

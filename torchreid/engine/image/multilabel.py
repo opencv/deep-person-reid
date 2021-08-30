@@ -1,12 +1,13 @@
 from __future__ import absolute_import, division, print_function
 
 import torch
+import torch.nn.functional as F
+from torch import nn
 
 from torchreid import metrics
 from torchreid.losses import AsymmetricLoss, AMBinaryLoss
 from torchreid.optim import SAM
 from ..engine import Engine
-import torch.nn.functional as F
 
 class MultilabelEngine(Engine):
     r"""Multilabel classification engine. It supports ASL, BCE and Angular margin loss with binary classification."""
@@ -32,27 +33,34 @@ class MultilabelEngine(Engine):
                         lr_finder=lr_finder,
                         use_ema_decay=use_ema_decay,
                         ema_decay=ema_decay)
-        if loss_name == 'asl':
-            self.main_loss = AsymmetricLoss(
-                gamma_neg=asl_gamma_neg,
-                gamma_pos=asl_gamma_pos,
-                probability_margin=asl_p_m,
-            )
-        elif loss_name == 'bce':
-            self.main_loss = AsymmetricLoss(
-                gamma_neg=0,
-                gamma_pos=0,
-                probability_margin=asl_p_m,
-            )
-        elif loss_name == 'am_binary':
-            self.main_loss = AMBinaryLoss(
-                m=m,
-                k=amb_k,
-                t=amb_t,
-                s=s,
-                sym_adjustment=sym_adjustment,
-                auto_balance=auto_balance
-            )
+        self.main_losses = nn.ModuleList()
+        num_classes = self.datamanager.num_train_pids
+        if not isinstance(num_classes, (list, tuple)):
+            num_classes = [num_classes]
+        self.num_classes = num_classes
+
+        for _ in enumerate(self.num_classes):
+            if loss_name == 'asl':
+                self.main_losses.append(AsymmetricLoss(
+                    gamma_neg=asl_gamma_neg,
+                    gamma_pos=asl_gamma_pos,
+                    probability_margin=asl_p_m,
+                ))
+            elif loss_name == 'bce':
+                self.main_losses.append(AsymmetricLoss(
+                    gamma_neg=0,
+                    gamma_pos=0,
+                    probability_margin=asl_p_m,
+                ))
+            elif loss_name == 'am_binary':
+                self.main_losses.append(AMBinaryLoss(
+                    m=m,
+                    k=amb_k,
+                    t=amb_t,
+                    s=s,
+                    sym_adjustment=sym_adjustment,
+                    auto_balance=auto_balance
+                ))
 
         num_classes = self.datamanager.num_train_pids
         if not isinstance(num_classes, (list, tuple)):
@@ -65,8 +73,8 @@ class MultilabelEngine(Engine):
     def forward_backward(self, data):
         n_iter = self.epoch * self.num_batches + self.batch_idx
 
-        train_records = self.parse_data_for_train(data, output_dict=False, use_gpu=self.use_gpu)
-        imgs, obj_ids = train_records
+        train_records = self.parse_data_for_train(data, output_dict=True, use_gpu=self.use_gpu)
+        imgs, obj_ids = train_records['img'], train_records['obj_id']
 
         model_names = self.get_model_names()
         num_models = len(model_names)
@@ -130,10 +138,9 @@ class MultilabelEngine(Engine):
 
         return loss_summary, avg_acc
 
-    def _single_model_losses(self, model, train_records, imgs, obj_ids, n_iter, model_name, num_packages):
-        run_kwargs = self._prepare_run_kwargs(obj_ids)
-        model_output = model(imgs, **run_kwargs)
-        all_logits, _ = self._parse_model_output(model_output)
+    def _single_model_losses(self, model, train_records, imgs, obj_ids, n_iter, model_name):
+        model_output = model(imgs)
+        all_logits = self._parse_model_output(model_output)
 
         total_loss = torch.zeros([], dtype=imgs.dtype, device=imgs.device)
         out_logits = []
@@ -152,8 +159,7 @@ class MultilabelEngine(Engine):
                 continue
 
             trg_logits = all_logits[trg_id][trg_mask]
-            main_loss = self.main_losses[trg_id](trg_logits, trg_obj_ids, aug_index=self.aug_index,
-                                                lam=self.lam, iteration=n_iter, scale=self.scales[model_name])
+            main_loss = self.main_losses[trg_id](trg_logits, trg_obj_ids)
             avg_acc += metrics.accuracy_multilabel(trg_logits, trg_obj_ids).item()
             loss_summary['main_{}/{}'.format(trg_id, model_name)] = main_loss.item()
 
@@ -166,12 +172,6 @@ class MultilabelEngine(Engine):
         total_loss /= float(num_trg_losses)
         avg_acc /= float(num_trg_losses)
 
-        if self.regularizer is not None and (self.epoch + 1) > self.fixbase_epoch:
-            reg_loss = self.regularizer(model)
-
-            loss_summary['reg/{}'.format(model_name)] = reg_loss.item()
-            total_loss += reg_loss
-
         return total_loss, loss_summary, avg_acc, out_logits
 
     def kl_div_binary(self, x, y):
@@ -180,4 +180,10 @@ class MultilabelEngine(Engine):
         y_log = torch.log(y)
         # mean(1) - mean over binary distributions first
         # mean(0) - mean over batch then
-        return F.kldiv(y_log, x, reduction='none').mean(1).mean(0)
+        return F.kl_div(y_log, x, reduction='none').mean(1).mean(0)
+
+    def _parse_model_output(self, model_output):
+        all_logits = model_output[0] if isinstance(model_output, (tuple, list)) else model_output
+        all_logits = all_logits if isinstance(all_logits, (tuple, list)) else [all_logits]
+
+        return all_logits
