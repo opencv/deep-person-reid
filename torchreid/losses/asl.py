@@ -58,7 +58,7 @@ class AsymmetricLoss(nn.Module):
                                           self.gamma_pos * self.targets + self.gamma_neg * self.anti_targets)
             self.loss *= self.asymmetric_w
 
-        # sum over batch reduction
+        # sum reduction over batch
         return -self.loss.sum()
 
 
@@ -118,8 +118,8 @@ class AMBinaryLoss(nn.Module):
             balance_koeff_pos = self.k / self.s
             balance_koeff_neg = (1 - self.k) / self.s
 
-        self.loss = balance_koeff_pos * self.targets * torch.log(self.xs_pos.clamp(min=self.eps))
-        self.loss.add_(balance_koeff_neg * self.anti_targets * torch.log(self.xs_neg.clamp(min=self.eps)))
+        self.loss = balance_koeff_pos * self.targets * torch.log(self.xs_pos)
+        self.loss.add_(balance_koeff_neg * self.anti_targets * torch.log(self.xs_neg))
 
         # Asymmetric Focusing
         if self.gamma_neg > 0 or self.gamma_pos > 0:
@@ -128,5 +128,5 @@ class AMBinaryLoss(nn.Module):
             self.asymmetric_w = torch.pow(1 - self.xs_pos - self.xs_neg,
                                           self.gamma_pos * self.targets + self.gamma_neg * self.anti_targets)
             self.loss *= self.asymmetric_w
-        # mean over batch reduction
+        # mean reduction over batch
         return self.loss.mean()
