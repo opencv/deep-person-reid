@@ -59,7 +59,9 @@ class MultilabelEngine(Engine):
                     t=amb_t,
                     s=s,
                     sym_adjustment=sym_adjustment,
-                    auto_balance=auto_balance
+                    auto_balance=auto_balance,
+                    gamma_neg=asl_gamma_neg,
+                    gamma_pos=asl_gamma_pos,
                 ))
 
         num_classes = self.datamanager.num_train_pids

@@ -70,6 +70,7 @@ class AMBinaryLoss(nn.Module):
         self.sym_adjustment = sym_adjustment
         self.gamma_neg = gamma_neg
         self.gamma_pos = gamma_pos
+        self.asymmetric_focus = gamma_neg > 0 or gamma_pos > 0
         self.auto_balance = auto_balance
         self.eps = eps
         self.label_smooth = label_smooth
@@ -110,18 +111,23 @@ class AMBinaryLoss(nn.Module):
         self.xs_neg = torch.sigmoid(self.s * (-cos_theta - self.m))
 
         if self.auto_balance:
+            assert not self.asymmetric_focus, "Auto balance is not compatible with asymmetric focussing"
             K = self.targets.size(1)
             C = self.targets.sum(1, keepdim=True) # number of target classes for each sample
             balance_koeff_pos = (K - C) / K # balance loss
             balance_koeff_neg = 1 - balance_koeff_pos
+        elif self.asymmetric_focus:
+            balance_koeff_pos = 1
+            balance_koeff_neg = 1
         else:
+            assert not self.asymmetric_focus and not self.auto_balance
             balance_koeff_pos = self.k / self.s
             balance_koeff_neg = (1 - self.k) / self.s
         self.loss = balance_koeff_pos * self.targets * torch.log(1 + torch.exp(-self.s * (cos_theta - self.m)))
         self.loss.add_(balance_koeff_neg * self.anti_targets * torch.log(1 + torch.exp(self.s * (cos_theta + self.m))))
 
         # Asymmetric Focusing
-        if self.gamma_neg > 0 or self.gamma_pos > 0:
+        if self.asymmetric_focus:
             self.xs_pos *= self.targets
             self.xs_neg *= self.anti_targets
             self.asymmetric_w = torch.pow(1 - self.xs_pos - self.xs_neg,
