@@ -70,6 +70,7 @@ class AMBinaryLoss(nn.Module):
         self.sym_adjustment = sym_adjustment
         self.gamma_neg = gamma_neg
         self.gamma_pos = gamma_pos
+        self.asymmetric_focus = gamma_neg > 0 or gamma_pos > 0
         self.auto_balance = auto_balance
         self.eps = eps
         self.label_smooth = label_smooth
