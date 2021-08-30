@@ -36,6 +36,7 @@ def build_engine(cfg, datamanager, model, optimizer, scheduler,
             reformulate=cfg.loss.softmax.augmentations.fmix.reformulate,
             pr_product=cfg.loss.softmax.pr_product,
             loss_name=cfg.loss.name,
+            epsilon=0.1,
             m=cfg.loss.softmax.m,
             s=cfg.loss.softmax.s,
             compute_s=cfg.loss.softmax.compute_s,
@@ -65,7 +66,7 @@ def build_engine(cfg, datamanager, model, optimizer, scheduler,
             amb_k = cfg.loss.am_binary.amb_k,
             amb_t=cfg.loss.am_binary.amb_t)
 
-    if cfg.loss.name in ['softmax', 'am_softmax', 'asl', 'am_asl']:
+    if cfg.loss.name in ['softmax', 'am_softmax']:
         engine = ImageAMSoftmaxEngine(
             **classification_params
         )
