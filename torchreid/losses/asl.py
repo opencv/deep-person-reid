@@ -24,7 +24,7 @@ class AsymmetricLoss(nn.Module):
     def get_last_scale(self):
         return 1.
 
-    def forward(self, inputs, targets, aug_index=None, lam=None, scale=None, iteration=None):
+    def forward(self, inputs, targets):
         """"
         Parameters
         ----------
@@ -88,7 +88,7 @@ class AMBinaryLoss(nn.Module):
     def sym_adjust(self, z):
         return 2 * torch.pow((z + 1)/2, self.t) - 1
 
-    def forward(self, cos_theta, targets, aug_index=None, lam=None, scale=None, iteration=None):
+    def forward(self, cos_theta, targets):
         """"
         Parameters
         ----------
