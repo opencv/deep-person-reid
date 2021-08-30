@@ -58,7 +58,7 @@ class AsymmetricLoss(nn.Module):
                                           self.gamma_pos * self.targets + self.gamma_neg * self.anti_targets)
             self.loss *= self.asymmetric_w
 
-        # sum over batch reduction
+        # sum reduction over batch
         return -self.loss.sum()
 
 
