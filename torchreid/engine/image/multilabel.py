@@ -179,10 +179,13 @@ class MultilabelEngine(Engine):
     def kl_div_binary(self, x, y):
         ''' compute KL divergence between two tensors represented
         independent binary distributions'''
-        y_log = torch.log(y)
-        # mean(1) - mean over binary distributions first
-        # mean(0) - mean over batch then
-        return F.kl_div(y_log, x, reduction='none').mean(1).mean(0)
+        # get binary distributions for two models with shape = (BxCx2)
+        p = torch.stack((x, (1-x))).permute(1,2,0)
+        q = torch.stack((y, (1-y))).permute(1,2,0)
+        # log probabilities
+        p_log = torch.log(p)
+        # mean over dists for each sample, than do the batchmean reduction
+        return F.kl_div(p_log, q, reduction='none').mean(2).sum().div_(x.size(0))
 
     def _parse_model_output(self, model_output):
         all_logits = model_output[0] if isinstance(model_output, (tuple, list)) else model_output

@@ -239,16 +239,10 @@ class ImageAMSoftmaxEngine(Engine):
                         continue
 
                     with torch.no_grad():
-                        if self.loss_name in ['asl', 'am_asl']:
-                            trg_probs = torch.sigmoid(torch.stack(out_logits[trg_id])).mean(dim=0)
-                        else:
                             trg_probs = torch.softmax(torch.stack(out_logits[trg_id]), dim=2).mean(dim=0)
 
                     for model_id, logits in enumerate(out_logits[trg_id]):
-                        if self.loss_name in ['asl', 'am_asl']:
-                            log_probs = F.logsigmoid(logits)
-                        else:
-                            log_probs = torch.log_softmax(logits, dim=1)
+                        log_probs = torch.log_softmax(logits, dim=1)
                         m_loss = (trg_probs * log_probs).sum(dim=1).mean().neg()
 
                         mutual_loss += m_loss

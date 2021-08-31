@@ -239,12 +239,15 @@ class MultiLabelClassification(ImageDataset):
             classes = sorted(annotation['classes'])
             class_to_idx = {classes[i]: i for i in range(len(classes))}
             images_info = annotation['images']
+            img_wo_objects = 0
             for img_info in images_info:
                 rel_image_path, img_labels = img_info
                 full_image_path = osp.join(data_dir, rel_image_path)
                 labels_idx = [class_to_idx[lbl] for lbl in img_labels if lbl in class_to_idx]
-                if not full_image_path or not labels_idx:
-                    continue
-                assert full_image_path and labels_idx
+                assert full_image_path
+                if not labels_idx:
+                    img_wo_objects += 1
                 out_data.append((full_image_path, tuple(labels_idx), 0, dataset_id, '', -1, -1))
+        if img_wo_objects:
+            print(f'WARNING: there are {img_wo_objects} images without labels and will be treated as negatives')
         return out_data
