@@ -990,7 +990,6 @@ class PairToTensor(object):
 
 _AUGMIX_TRANSFORMS_GREY = [
             'SharpnessIncreasing',  # not in paper
-            'Rotate',
             'ShearX',
             'ShearY',
             'TranslateXRel',
@@ -1003,7 +1002,6 @@ _AUGMIX_TRANSFORMS = [
             'ContrastIncreasing',  # not in paper
             'BrightnessIncreasing',  # not in paper
             'SharpnessIncreasing',  # not in paper
-            'Rotate',
             'Equalize',
             'PosterizeIncreasing',
             'SolarizeIncreasing',
