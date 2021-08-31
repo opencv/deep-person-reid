@@ -291,6 +291,7 @@ class Engine:
         perf_monitor=None,
         stop_callback=None,
         initial_seed=5,
+        compression_ctrl=None,
         **kwargs
     ):
         r"""A unified pipeline for training and evaluating a model.
@@ -372,6 +373,8 @@ class Engine:
             # change the NumPy’s seed at every epoch
             np.random.seed(initial_seed + self.epoch)
             if perf_monitor and not lr_finder: perf_monitor.on_train_epoch_begin()
+            if compression_ctrl is not None:
+                compression_ctrl.scheduler.epoch_step(self.epoch)
             self.train(
                 print_freq=print_freq,
                 fixbase_epoch=fixbase_epoch,
@@ -379,7 +382,11 @@ class Engine:
                 lr_finder = lr_finder,
                 perf_monitor=perf_monitor,
                 stop_callback=stop_callback,
+                compression_ctrl=compression_ctrl
             )
+            if compression_ctrl is not None:
+                print(compression_ctrl.statistics().to_str())
+
             if stop_callback and stop_callback.check_stop():
                 break
             if perf_monitor and not lr_finder: perf_monitor.on_train_epoch_end()
@@ -476,7 +483,7 @@ class Engine:
         set_random_seed(self.seed)
 
     def train(self, print_freq=10, fixbase_epoch=0, open_layers=None, lr_finder=False, perf_monitor=None,
-              stop_callback=None):
+              stop_callback=None, compression_ctrl=None):
         losses = MetricMeter()
         batch_time = AverageMeter()
         data_time = AverageMeter()
@@ -504,6 +511,8 @@ class Engine:
 
             data_time.update(time.time() - end)
 
+            if compression_ctrl:
+                compression_ctrl.scheduler.step(self.batch_idx)
             loss_summary, avg_acc = self.forward_backward(data)
             batch_time.update(time.time() - end)
 

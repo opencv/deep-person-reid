@@ -147,7 +147,7 @@ def make_nncf_changes_in_training(model, cfg, classes, command_line_cfg_opts):
                                         is_initial_lr_set_from_opts)
     assert lr is not None
     cfg.train.lr = lr
-    return model, cfg, lr, nncf_metainfo
+    return compression_ctrl, model, cfg, lr, nncf_metainfo
 
 def make_nncf_changes_in_eval(model, cfg):
     # See details on nncf_training_config in the comment in
