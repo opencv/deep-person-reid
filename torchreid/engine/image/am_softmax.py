@@ -239,7 +239,7 @@ class ImageAMSoftmaxEngine(Engine):
                         continue
 
                     with torch.no_grad():
-                            trg_probs = torch.softmax(torch.stack(out_logits[trg_id]), dim=2).mean(dim=0)
+                        trg_probs = torch.softmax(torch.stack(out_logits[trg_id]), dim=2).mean(dim=0)
 
                     for model_id, logits in enumerate(out_logits[trg_id]):
                         log_probs = torch.log_softmax(logits, dim=1)
