@@ -17,7 +17,7 @@ def nullcontext():
 
 def get_no_nncf_trace_context_manager():
     try:
-        from nncf.dynamic_graph.context import \
+        from nncf.torch.dynamic_graph.context import \
             no_nncf_trace as original_no_nncf_trace
         return original_no_nncf_trace
     except ImportError:
@@ -57,7 +57,7 @@ def _load_checkpoint_for_nncf(model, filename, map_location=None, strict=False):
     Returns:
         dict or OrderedDict: The loaded checkpoint.
     """
-    from nncf import load_state
+    from nncf.torch import load_state
 
     checkpoint = torch.load(filename, map_location=map_location)
     # get state_dict from checkpoint
@@ -226,6 +226,6 @@ def wrap_nncf_model(model, cfg, datamanager_for_init,
                                                       nncf_config,
                                                       dummy_forward_fn=dummy_forward,
                                                       wrap_inputs_fn=wrap_inputs,
-                                                      resuming_state_dict=resuming_state_dict)
+                                                      compression_state=resuming_state_dict)
 
     return compression_ctrl, model, nncf_metainfo
