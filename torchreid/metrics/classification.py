@@ -140,7 +140,10 @@ def get_invalid(scores, gt_labels, data_info):
 
 
 def evaluate_classification(dataloader, model, use_gpu, topk=(1,), labelmap=[]):
-    if model.is_ie_model:
+    is_ie_model = model.module.is_ie_model if isinstance(model, torch.nn.parallel.DataParallel) \
+        else model.is_ie_model
+
+    if is_ie_model:
         scores, labels = score_extraction_from_ir(dataloader, model, labelmap)
     else:
         scores, labels = score_extraction(dataloader, model, use_gpu, labelmap)
