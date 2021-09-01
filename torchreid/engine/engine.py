@@ -620,7 +620,8 @@ class Engine:
                         ranks=ranks,
                         lr_finder=lr_finder
                     )
-                    if self.use_ema_decay and not lr_finder and not test_only:
+                    if (self.use_ema_decay and not lr_finder
+                        and not test_only and model_name == self.main_model_name):
                         ema_top1, ema_top5, ema_mAP = self._evaluate_classification(
                             model=self.ema_model.module,
                             epoch=epoch,
@@ -633,6 +634,10 @@ class Engine:
                 elif model_type == 'contrastive':
                     pass
                 elif model_type == 'multilabel':
+                    # do not evaluate second model till last epoch
+                    if (model_name != self.main_model_name
+                        and not test_only and epoch != (self.max_epoch - 1)):
+                        continue
                     cur_mAP = self._evaluate_multilabel_classification(
                         model=model,
                         epoch=epoch,
@@ -641,7 +646,8 @@ class Engine:
                         dataset_name=dataset_name,
                         lr_finder=lr_finder
                     )
-                    if self.use_ema_decay and not lr_finder and not test_only:
+                    if (self.use_ema_decay and not lr_finder
+                        and not test_only and model_name == self.main_model_name):
                         ema_mAP = self._evaluate_multilabel_classification(
                             model=self.ema_model.module,
                             epoch=epoch,
