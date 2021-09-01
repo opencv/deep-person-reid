@@ -4,6 +4,7 @@ import re
 import tempfile
 from pathlib import Path
 from subprocess import run
+import json
 
 import numpy as np
 from ruamel.yaml import YAML
@@ -27,6 +28,12 @@ def main():
     parser.add_argument('--path-to-main', type=str, default='./tools/main.py',required=False, help='path to main.py file')
     parser.add_argument('--gpu-num', type=int, default=1, help='Number of GPUs for training. 0 is for CPU mode')
     parser.add_argument('--use-hardcoded-lr', action='store_true')
+    parser.add_argument('-d','--domains', nargs='+', help='On what domains to train', required=False, default=['all'])
+    parser.add_argument('-lrs', '--lr-sets', type=json.loads, default='{"CIFAR100": 0.005, "pets": 0.005,'
+                                                                            '"caltech101": 0.015, "cars": 0.025, "flowers": 0.02,'
+                                                                            '"DTD": 0.008, "FOOD101": 0.015, "birdsnap": 0.015,'
+                                                                            '"FashionMNIST": 0.012, "SUN397": 0.008, "SVHN": 0.015,'
+                                                                            '"attd_mi02_v3": 0.005, "attd_mi04_v4": 0.012, "lgchem": 0.015, "autism": 0.015}')
     parser.add_argument('--dump-results', type=bool, default=True, help='whether or not to dump results of the experiment')
     args = parser.parse_args()
     yaml = YAML()
@@ -121,17 +128,6 @@ def main():
             batch_size=128,
             num_C=37
         ),
-        Xray=dict(
-            resolution=(224, 224),
-            epochs=70,
-            roots=['Xray/train', 'Xray/val'],
-            names=['Xray_train', 'Xray_val'],
-            types=['classification_image_folder', 'classification_image_folder'],
-            sources='Xray_train',
-            targets='Xray_val',
-            batch_size=128,
-            num_C=2
-        ),
         birdsnap=dict(
             resolution=(224, 224),
             epochs=35,
@@ -175,17 +171,6 @@ def main():
             batch_size=128,
             num_C=101
         ),
-        brain_tumor=dict(
-            resolution=(224, 224),
-            epochs=35,
-            roots=['brain_tumor/train.txt', 'brain_tumor/val.txt'],
-            names=['brain_tumor_train', 'brain_tumor_val'],
-            types=['classification', 'classification'],
-            sources='brain_tumor_train',
-            targets='brain_tumor_val',
-            batch_size=128,
-            num_C=101
-        ),
         autism=dict(
             resolution=(224, 224),
             epochs=35,
@@ -194,28 +179,6 @@ def main():
             types=['classification_image_folder', 'classification_image_folder'],
             sources='autism_train',
             targets='autism_val',
-            batch_size=128,
-            num_C=101
-        ),
-        medicalMNIST=dict(
-            resolution=(224, 224),
-            epochs=35,
-            roots=['medicalMNIST/train.txt', 'medicalMNIST/val.txt'],
-            names=['medicalMNIST_train', 'medicalMNIST_val'],
-            types=['classification', 'classification'],
-            sources='medicalMNIST_train',
-            targets='medicalMNIST_val',
-            batch_size=128,
-            num_C=101
-        ),
-        Covid19=dict(
-            resolution=(224, 224),
-            epochs=35,
-            roots=['Covid19/train', 'Covid19/val'],
-            names=['Covid19_train', 'Covid19_val'],
-            types=['classification_image_folder', 'classification_image_folder'],
-            sources='Covid19_train',
-            targets='Covid19_val',
             batch_size=128,
             num_C=101
         ),
@@ -245,10 +208,13 @@ def main():
 
     path_to_base_cfg = args.config
     # write datasets you want to skip
-    to_train = {'pets', 'caltech101', 'cars', 'CIFAR100', 'DTD', 'FOOD101'}
+    domains = args.domains
+    if 'all' in domains:
+        domains = set(datasets.keys())
+    lrs_dict = args.lr_sets
 
     for key, params in datasets.items():
-        if key not in to_train:
+        if key not in domains:
             continue
         cfg = read_config(yaml, path_to_base_cfg)
         path_to_exp_folder = cfg['data']['save_dir']
@@ -259,23 +225,12 @@ def main():
         root_train = args.root + os.sep + params['roots'][0]
         root_val = args.root + os.sep + params['roots'][1]
         if args.use_hardcoded_lr:
-            cfg['lr_finder']["enable"] = False
             print("WARNING: Using hardcoded LR")
-            if key in ["cars", "caltech101"]:
-                cfg["train"]["lr"] = 0.025
-            elif key in ["pets", "CIFAR100"]:
-                cfg["train"]["lr"] = 0.005
-            elif key in ["flowers"]:
-                cfg['train']['lr'] = 0.02
-            elif key in ["DTD"]:
-                cfg["train"]["lr"] = 0.008
-            elif key in ["LGChenck", "autism", 'FOOD101']:
-                cfg["train"]["lr"] = 0.015
-            elif key in ["attd_mi02_v3"]:
-                cfg["train"]["lr"] = 0.005
-            elif key in ["attd_mi04_v4"]:
-                cfg["train"]["lr"] = 0.012
-
+            if key in lrs_dict:
+                cfg['lr_finder']["enable"] = False
+                cfg["train"]["lr"] = lrs_dict[key]
+            else:
+                cfg['lr_finder']["enable"] = True
 
         cfg['custom_datasets']['roots'] = [root_train, root_val]
         cfg['custom_datasets']['types'] = [type_train, type_val]
