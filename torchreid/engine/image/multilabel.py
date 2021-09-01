@@ -16,7 +16,7 @@ class MultilabelEngine(Engine):
                  train_patience, early_stoping, lr_decay_factor, loss_name, label_smooth,
                  lr_finder, m, s, sym_adjustment, auto_balance, amb_k, amb_t,
                  enable_sam, should_freeze_aux_models, nncf_metainfo, initial_lr,
-                 use_ema_decay, ema_decay, asl_gamma_pos, asl_gamma_neg, asl_p_m, **kwargs):
+                 target_metric, use_ema_decay, ema_decay, asl_gamma_pos, asl_gamma_neg, asl_p_m, **kwargs):
 
         super().__init__(datamanager,
                         models=models,
@@ -31,8 +31,10 @@ class MultilabelEngine(Engine):
                         nncf_metainfo=nncf_metainfo,
                         initial_lr=initial_lr,
                         lr_finder=lr_finder,
+                        target_metric=target_metric,
                         use_ema_decay=use_ema_decay,
                         ema_decay=ema_decay)
+
         self.main_losses = nn.ModuleList()
         num_classes = self.datamanager.num_train_pids
         if not isinstance(num_classes, (list, tuple)):
@@ -50,7 +52,7 @@ class MultilabelEngine(Engine):
                 self.main_losses.append(AsymmetricLoss(
                     gamma_neg=0,
                     gamma_pos=0,
-                    probability_margin=asl_p_m,
+                    probability_margin=0
                 ))
             elif loss_name == 'am_binary':
                 self.main_losses.append(AMBinaryLoss(
@@ -70,7 +72,6 @@ class MultilabelEngine(Engine):
         self.num_classes = num_classes
         self.num_targets = len(self.num_classes)
         self.enable_sam = enable_sam
-
 
     def forward_backward(self, data):
         n_iter = self.epoch * self.num_batches + self.batch_idx

@@ -60,6 +60,7 @@ class Engine:
                  should_freeze_aux_models=False,
                  nncf_metainfo=None,
                  initial_lr=None,
+                 target_metric = 'train_loss',
                  epoch_interval_for_aux_model_freeze=None,
                  epoch_interval_for_turn_off_mutual_learning=None,
                  use_ema_decay=False,
@@ -80,6 +81,8 @@ class Engine:
         self.best_metric = 0.0
         self.max_epoch = None
         self.num_batches = None
+        assert target_metric in ['train_loss', 'test_acc']
+        self.target_metric = target_metric
         self.epoch = None
         self.train_patience = train_patience
         self.early_stoping = early_stoping
@@ -376,7 +379,7 @@ class Engine:
             # change the NumPy’s seed at every epoch
             np.random.seed(initial_seed + self.epoch)
             if perf_monitor and not lr_finder: perf_monitor.on_train_epoch_begin()
-            self.train(
+            avg_loss = self.train(
                 print_freq=print_freq,
                 fixbase_epoch=fixbase_epoch,
                 open_layers=open_layers,
@@ -405,6 +408,10 @@ class Engine:
                     ranks=ranks,
                     lr_finder=lr_finder,
                 )
+
+            target_metric = top1 if self.target_metric == 'test_acc' else avg_loss
+            if not lr_finder and not self.per_batch_annealing:
+                self.update_lr(output_avg_metric = target_metric)
 
                 if lr_finder:
                     print(f"epoch: {self.epoch}\t top1: {top1}\t lr: {self.get_current_lr()}")
@@ -560,8 +567,7 @@ class Engine:
             if self.per_batch_annealing:
                 self.update_lr()
 
-        if not lr_finder and not self.per_batch_annealing:
-            self.update_lr(output_avg_metric = losses.meters['loss'].avg)
+        return losses.meters['loss'].avg
 
     def forward_backward(self, data):
         raise NotImplementedError

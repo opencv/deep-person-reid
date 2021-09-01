@@ -42,7 +42,7 @@ class ImageAMSoftmaxEngine(Engine):
                  reformulate, aug_prob, conf_penalty, pr_product, m, s, compute_s, end_s,
                  duration_s, skip_steps_s, enable_masks, adaptive_margins, class_weighting,
                  attr_cfg, base_num_classes, symmetric_ce, mix_weight, enable_rsc, enable_sam,
-                 should_freeze_aux_models, nncf_metainfo, initial_lr, use_ema_decay, ema_decay, **kwargs):
+                 should_freeze_aux_models, nncf_metainfo, initial_lr, target_metric, use_ema_decay, ema_decay, **kwargs):
         super(ImageAMSoftmaxEngine, self).__init__(datamanager,
                                                    models=models,
                                                    optimizers=optimizers,
@@ -55,14 +55,15 @@ class ImageAMSoftmaxEngine(Engine):
                                                    should_freeze_aux_models=should_freeze_aux_models,
                                                    nncf_metainfo=nncf_metainfo,
                                                    initial_lr=initial_lr,
+                                                   target_metric=target_metric,
                                                    lr_finder=lr_finder,
                                                    use_ema_decay=use_ema_decay,
                                                    ema_decay=ema_decay)
 
-        assert loss_name in ['softmax', 'am']
+        assert loss_name in ['softmax', 'am_softmax']
         self.loss_name = loss_name
         assert s > 0.0
-        if loss_name == 'am':
+        if loss_name == 'am_softmax':
             assert m >= 0.0
 
         self.regularizer = get_regularizer(reg_cfg)
