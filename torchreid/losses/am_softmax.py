@@ -56,14 +56,13 @@ class AMSoftmaxLoss(nn.Module):
 
     def __init__(self, use_gpu=True, margin_type='cos', gamma=0.0, m=0.5, t=1.0,
                  s=30, end_s=None, duration_s=None, skip_steps_s=None, conf_penalty=0.0,
-                 label_smooth=False, epsilon=0.1, aug_type='', pr_product=False,
+                 label_smooth=0, epsilon=0.1, aug_type='', pr_product=False,
                  symmetric_ce=False, class_counts=None, adaptive_margins=False,
                  class_weighting=False):
         super(AMSoftmaxLoss, self).__init__()
         self.use_gpu = use_gpu
         self.conf_penalty = conf_penalty
         self.label_smooth = label_smooth
-        self.epsilon = epsilon
         self.aug_type = aug_type
         self.pr_product = pr_product
 
@@ -206,11 +205,11 @@ class AMSoftmaxLoss(nn.Module):
         if self.gamma == 0.0 and self.t == 1.0:
             output *= self.last_scale
 
-            if self.label_smooth:
+            if self.label_smooth > 0:
                 assert not self.aug_type
                 target = torch.zeros(output.size(), device=target.device).scatter_(1, target.detach().unsqueeze(1), 1)
                 num_classes = output.size(1)
-                target = (1.0 - self.epsilon) * target + self.epsilon / float(num_classes)
+                target = (1.0 - self.label_smooth) * target + self.label_smooth / float(num_classes)
                 losses = (- target * F.log_softmax(output, dim=1)).sum(dim=1)
 
             elif (self.aug_type and aug_index is not None and lam is not None):

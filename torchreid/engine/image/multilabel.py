@@ -14,7 +14,7 @@ class MultilabelEngine(Engine):
 
     def __init__(self, datamanager, models, optimizers, schedulers, use_gpu, save_chkpt,
                  train_patience, early_stoping, lr_decay_factor, loss_name, label_smooth,
-                 lr_finder, m, s, sym_adjustment, auto_balance, amb_k, amb_t,
+                 lr_finder, m, s, sym_adjustment, auto_balance, amb_k, amb_t, clip_grad,
                  enable_sam, should_freeze_aux_models, nncf_metainfo, initial_lr,
                  target_metric, use_ema_decay, ema_decay, asl_gamma_pos, asl_gamma_neg, asl_p_m, **kwargs):
 
@@ -36,6 +36,7 @@ class MultilabelEngine(Engine):
                         ema_decay=ema_decay)
 
         self.main_losses = nn.ModuleList()
+        self.clip_grad = clip_grad
         num_classes = self.datamanager.num_train_pids
         if not isinstance(num_classes, (list, tuple)):
             num_classes = [num_classes]
@@ -47,12 +48,14 @@ class MultilabelEngine(Engine):
                     gamma_neg=asl_gamma_neg,
                     gamma_pos=asl_gamma_pos,
                     probability_margin=asl_p_m,
+                    label_smooth=label_smooth,
                 ))
             elif loss_name == 'bce':
                 self.main_losses.append(AsymmetricLoss(
                     gamma_neg=0,
                     gamma_pos=0,
-                    probability_margin=0
+                    probability_margin=0,
+                    label_smooth=label_smooth,
                 ))
             elif loss_name == 'am_binary':
                 self.main_losses.append(AMBinaryLoss(
@@ -64,6 +67,7 @@ class MultilabelEngine(Engine):
                     auto_balance=auto_balance,
                     gamma_neg=asl_gamma_neg,
                     gamma_pos=asl_gamma_pos,
+                    label_smooth=label_smooth,
                 ))
 
         num_classes = self.datamanager.num_train_pids
@@ -93,7 +97,6 @@ class MultilabelEngine(Engine):
 
             for model_name in model_names:
                 self.optims[model_name].zero_grad()
-
                 model_loss, model_loss_summary, model_avg_acc, model_logits = self._single_model_losses(
                     self.models[model_name], train_records, imgs, obj_ids, n_iter, model_name)
                 avg_acc += model_avg_acc / float(num_models)
@@ -128,6 +131,8 @@ class MultilabelEngine(Engine):
             total_loss.backward(retain_graph=False)
 
             for model_name in model_names:
+                if self.clip_grad != 0:
+                    torch.nn.utils.clip_grad_norm_(self.models[model_name].parameters(), self.clip_grad)
                 if not isinstance(self.optims[model_name], SAM) and step == 1:
                     self.optims[model_name].step()
                 elif step == 1:
@@ -184,7 +189,7 @@ class MultilabelEngine(Engine):
         p = torch.stack((x, (1-x))).permute(1,2,0)
         q = torch.stack((y, (1-y))).permute(1,2,0)
         # log probabilities
-        p_log = torch.log(p)
+        p_log = torch.log(p.add_(1e-8))
         # compute true KLDiv for each sample, than do the batchmean reduction
         return F.kl_div(p_log, q, reduction='none').sum(2).div_(x.size(1)).sum().div_(x.size(0))
 

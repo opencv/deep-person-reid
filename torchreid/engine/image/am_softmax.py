@@ -38,8 +38,8 @@ class ImageAMSoftmaxEngine(Engine):
 
     def __init__(self, datamanager, models, optimizers, reg_cfg, metric_cfg, schedulers, use_gpu, save_chkpt,
                  train_patience, early_stoping, lr_decay_factor, loss_name, label_smooth,
-                 margin_type, epsilon, aug_type, decay_power, alpha, size, lr_finder, max_soft,
-                 reformulate, aug_prob, conf_penalty, pr_product, m, s, compute_s, end_s,
+                 margin_type, aug_type, decay_power, alpha, size, lr_finder, max_soft,
+                 reformulate, aug_prob, conf_penalty, pr_product, m, s, compute_s, end_s, clip_grad,
                  duration_s, skip_steps_s, enable_masks, adaptive_margins, class_weighting,
                  attr_cfg, base_num_classes, symmetric_ce, mix_weight, enable_rsc, enable_sam,
                  should_freeze_aux_models, nncf_metainfo, initial_lr, target_metric, use_ema_decay, ema_decay, **kwargs):
@@ -70,6 +70,7 @@ class ImageAMSoftmaxEngine(Engine):
         self.enable_metric_losses = metric_cfg.enable
         self.enable_masks = enable_masks
         self.mix_weight = mix_weight
+        self.clip_grad = clip_grad
         self.enable_rsc = enable_rsc
         self.enable_sam = enable_sam
         self.aug_type = aug_type
@@ -115,12 +116,11 @@ class ImageAMSoftmaxEngine(Engine):
                 self.main_losses.append(CrossEntropyLoss(
                     use_gpu=self.use_gpu,
                     label_smooth=label_smooth,
-                    epsilon=epsilon,
                     augmentations=self.aug_type,
                     conf_penalty=conf_penalty,
                     scale=scale_factor * s
                 ))
-            elif loss_name == 'am':
+            elif loss_name == 'am_softmax':
                 trg_class_counts = datamanager.data_counts[trg_id]
                 assert len(trg_class_counts) == trg_num_classes
 
@@ -128,7 +128,6 @@ class ImageAMSoftmaxEngine(Engine):
                     use_gpu=self.use_gpu,
                     label_smooth=label_smooth,
                     margin_type=margin_type,
-                    epsilon=epsilon,
                     aug_type=aug_type,
                     conf_penalty=conf_penalty,
                     m=m,
@@ -259,6 +258,8 @@ class ImageAMSoftmaxEngine(Engine):
             total_loss.backward(retain_graph=self.enable_metric_losses)
 
             for model_name in model_names:
+                if self.clip_grad != 0:
+                    torch.nn.utils.clip_grad_norm_(self.models[model_name].parameters(), self.clip_grad)
                 for trg_id in range(self.num_targets):
                     if self.enable_metric_losses:
                         ml_loss_module = self.ml_losses[trg_id][model_name]

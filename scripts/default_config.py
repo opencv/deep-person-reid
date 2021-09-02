@@ -143,6 +143,7 @@ def get_default_config():
     cfg.train.seed = 5  # random seed
     cfg.train.deterministic = False # define to use cuda.deterministic
     cfg.train.warmup = 1  # After fixbase_epoch
+    cfg.train.clip_grad = 0.
     cfg.train.ema = CN()
     cfg.train.ema.enable = False
     cfg.train.ema.ema_decay = 0.9999
@@ -165,7 +166,7 @@ def get_default_config():
     cfg.loss = CN()
     cfg.loss.name = 'softmax'
     cfg.loss.softmax = CN()
-    cfg.loss.softmax.label_smooth = False  # use label smoothing regularizer
+    cfg.loss.softmax.label_smooth = 0.  # use label smoothing regularizer
     cfg.loss.softmax.margin_type = 'cos'
     cfg.loss.softmax.augmentations = CN()
     cfg.loss.softmax.augmentations.aug_type = '' # use advanced augmentations like fmix, cutmix and mixup

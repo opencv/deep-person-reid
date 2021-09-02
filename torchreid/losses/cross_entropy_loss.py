@@ -28,15 +28,14 @@ class CrossEntropyLoss(nn.Module):
         label_smooth (bool, optional): whether to apply label smoothing. Default is True.
     """
 
-    def __init__(self, scale=1.0, epsilon=0.1, use_gpu=True, label_smooth=True,
+    def __init__(self, scale=1.0, epsilon=0.1, use_gpu=True, label_smooth=0,
                  conf_penalty=None, penalty_scale=5.0, augmentations=None):
         super(CrossEntropyLoss, self).__init__()
 
         self.scale = scale
-        self.epsilon = epsilon if label_smooth else 0
+        self.label_smooth = label_smooth
         self.use_gpu = use_gpu
         self.conf_penalty = conf_penalty
-        self.label_smooth = label_smooth
         self.aug = augmentations
         self.penalty_scale = penalty_scale
 
@@ -61,8 +60,8 @@ class CrossEntropyLoss(nn.Module):
             targets = targets.cuda()
 
         num_classes = inputs.size(1)
-        if self.label_smooth:
-            targets = (1.0 - self.epsilon) * targets + self.epsilon / float(num_classes)
+        if self.label_smooth > 0:
+            targets = (1.0 - self.label_smooth) * targets + self.label_smooth / float(num_classes)
 
         if (self.aug and aug_index is not None and lam is not None):
             targets2 = targets[aug_index]
@@ -87,11 +86,11 @@ class CrossEntropyLoss(nn.Module):
 
 
 class PseudoCrossEntropyLoss(nn.Module):
-    def __init__(self, scale=1.0, epsilon=0.1, use_gpu=True, label_smooth=True, conf_penalty=None):
+    def __init__(self, scale=1.0, epsilon=0.1, use_gpu=True, label_smooth=0, conf_penalty=None):
         super(PseudoCrossEntropyLoss, self).__init__()
 
         self.scale = scale
-        self.epsilon = epsilon if label_smooth else 0
+        self.label_smooth = label_smooth
         self.use_gpu = use_gpu
         self.conf_penalty = conf_penalty
 
