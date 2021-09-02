@@ -1,11 +1,16 @@
 """
  MIT License
+
  Copyright (c) 2018 Kaiyang Zhou
+
  Copyright (c) 2019 Intel Corporation
+
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
  You may obtain a copy of the License at
+
       http://www.apache.org/licenses/LICENSE-2.0
+
  Unless required by applicable law or agreed to in writing, software
  distributed under the License is distributed on an "AS IS" BASIS,
  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -505,8 +510,10 @@ class ImageAMSoftmaxEngine(Engine):
     def exit_on_plateau_and_choose_best(self, top1, smooth_top1):
         '''
         The function returns a pair (should_exit, is_candidate_for_best).
+
         The function sets this checkpoint as a candidate for best if either it is the first checkpoint
         for this LR or this checkpoint is better then the previous best.
+
         The function sets should_exit = True if the LR is the minimal allowed
         LR (i.e. self.lb_lr) and the best checkpoint is not changed for self.train_patience
         epochs.
