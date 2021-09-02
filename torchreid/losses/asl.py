@@ -8,13 +8,12 @@ class AsymmetricLoss(nn.Module):
 
     def __init__(self, gamma_neg=4, gamma_pos=0,
                     probability_margin=0.05, eps=1e-8,
-                    label_smooth=False, ls_eps=0.1):
+                    label_smooth=0.):
         super().__init__()
 
         self.gamma_neg = gamma_neg
         self.gamma_pos = gamma_pos
         self.label_smooth = label_smooth
-        self.ls_eps = ls_eps
         self.clip = probability_margin
         self.eps = eps
 
@@ -31,9 +30,9 @@ class AsymmetricLoss(nn.Module):
         inputs: input logits
         targets: targets (multi-label binarized vector)
         """
-        if self.label_smooth:
-            targets = targets * (1-self.ls_eps)
-            targets[targets == 0] = self.ls_eps
+        if self.label_smooth > 0:
+            targets = targets * (1-self.label_smooth)
+            targets[targets == 0] = self.label_smooth
 
         self.targets = targets
         self.anti_targets = 1 - targets
@@ -65,7 +64,7 @@ class AsymmetricLoss(nn.Module):
 class AMBinaryLoss(nn.Module):
     def __init__(self, m=0.35, k=0.8, t=1, s=30,
                 eps=1e-8, sym_adjustment=False, auto_balance=False,
-                label_smooth=False, ls_eps=0.1, gamma_neg=0, gamma_pos=0):
+                label_smooth=0., gamma_neg=0, gamma_pos=0):
         super().__init__()
         self.sym_adjustment = sym_adjustment
         self.gamma_neg = gamma_neg
@@ -74,7 +73,6 @@ class AMBinaryLoss(nn.Module):
         self.auto_balance = auto_balance
         self.eps = eps
         self.label_smooth = label_smooth
-        self.ls_eps = ls_eps
         self.m = m
         self.t = t
         self.k = k
@@ -96,9 +94,9 @@ class AMBinaryLoss(nn.Module):
         cos_theta: dot product between normalized features and proxies
         targets: targets (multi-label binarized vector)
         """
-        if self.label_smooth:
-            targets = targets * (1-self.ls_eps)
-            targets[targets == 0] = self.ls_eps
+        if self.label_smooth > 0:
+            targets = targets * (1-self.label_smooth)
+            targets[targets == 0] = self.label_smooth
 
         self.targets = targets
         self.anti_targets = 1 - targets
