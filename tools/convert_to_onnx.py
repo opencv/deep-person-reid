@@ -95,7 +95,8 @@ def main():
         cfg = make_nncf_changes_in_main_training_config(cfg, args.opts)
     cfg.freeze()
 
-    num_classes = parse_num_classes(cfg.data.sources, cfg.model.classification, args.num_classes, cfg.model.load_weights)
+    is_classification = cfg.model.type=='classification'
+    num_classes = parse_num_classes(cfg.data.sources, is_classification, args.num_classes, cfg.model.load_weights)
     model = build_model(**model_kwargs(cfg, num_classes))
     load_pretrained_weights(model, cfg.model.load_weights)
 
