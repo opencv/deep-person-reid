@@ -382,7 +382,7 @@ class Engine:
             if perf_monitor and not lr_finder: perf_monitor.on_train_epoch_begin()
             if compression_ctrl is not None:
                 compression_ctrl.scheduler.epoch_step(self.epoch)
-            self.train(
+            avg_loss = self.train(
                 print_freq=print_freq,
                 fixbase_epoch=fixbase_epoch,
                 open_layers=open_layers,
