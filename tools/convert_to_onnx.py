@@ -15,17 +15,14 @@
 """
 
 import argparse
+import os
 
-import onnx
 import torch
 
 from scripts.default_config import get_default_config, model_kwargs, merge_from_files_with_base
-from scripts.script_utils import group_norm_symbolic
-from torch.onnx.symbolic_registry import register_op
-
-from torchreid.data.transforms import build_inference_transform
+from torchreid.apis.export import export_onnx, export_ir
 from torchreid.models import build_model
-from torchreid.utils import check_isfile, load_checkpoint, load_pretrained_weights, random_image
+from torchreid.utils import load_checkpoint, load_pretrained_weights
 from torchreid.integration.nncf.compression import is_checkpoint_nncf
 from torchreid.integration.nncf.compression_script_utils import (make_nncf_changes_in_eval,
                                                                  make_nncf_changes_in_main_training_config)
@@ -78,6 +75,7 @@ def main():
     parser.add_argument('--verbose', default=False, action='store_true',
                         help='Verbose mode for onnx.export')
     parser.add_argument('--disable-dyn-axes', default=False, action='store_true')
+    parser.add_argument('--export_ir', default=False, action='store_true')
     parser.add_argument('opts', default=None, nargs=argparse.REMAINDER,
                         help='Modify config options using the command-line')
     args = parser.parse_args()
@@ -95,8 +93,8 @@ def main():
         cfg = make_nncf_changes_in_main_training_config(cfg, args.opts)
     cfg.freeze()
 
-    is_classification = cfg.model.type=='classification'
-    num_classes = parse_num_classes(cfg.data.sources, is_classification, args.num_classes, cfg.model.load_weights)
+    num_classes = parse_num_classes(cfg.data.sources, cfg.model.type == 'classification' or cfg.model.type == 'multilabel',
+                                    args.num_classes, cfg.model.load_weights)
     model = build_model(**model_kwargs(cfg, num_classes))
     load_pretrained_weights(model, cfg.model.load_weights)
 
@@ -105,51 +103,9 @@ def main():
         model = make_nncf_changes_in_eval(model, cfg)
         print('End making NNCF changes in model')
 
-    model.eval()
-
-    transform = build_inference_transform(
-        cfg.data.height,
-        cfg.data.width,
-        norm_mean=cfg.data.norm_mean,
-        norm_std=cfg.data.norm_std,
-    )
-
-    input_img = random_image(cfg.data.height, cfg.data.width)
-    input_blob = transform(input_img).unsqueeze(0)
-
-    input_names = ['data']
-    output_names = ['reid_embedding']
-    if not args.disable_dyn_axes:
-        dynamic_axes = {'data': {0: 'batch_size', 1: 'channels', 2: 'height', 3: 'width'},
-                        'reid_embedding': {0: 'batch_size', 1: 'dim'}}
-    else:
-        dynamic_axes = {}
-
-    output_file_path = args.output_name
-    if not args.output_name.endswith('.onnx'):
-        output_file_path += '.onnx'
-
-    register_op("group_norm", group_norm_symbolic, "", args.opset)
-    with torch.no_grad():
-        torch.onnx.export(
-            model,
-            input_blob,
-            output_file_path,
-            verbose=args.verbose,
-            export_params=True,
-            input_names=input_names,
-            output_names=output_names,
-            dynamic_axes=dynamic_axes,
-            opset_version=args.opset,
-            operator_export_type=torch.onnx.OperatorExportTypes.ONNX
-        )
-
-    net_from_onnx = onnx.load(output_file_path)
-    try:
-        onnx.checker.check_model(net_from_onnx)
-        print('ONNX check passed.')
-    except onnx.onnx_cpp2py_export.checker.ValidationError as ex:
-        print('ONNX check failed: {}.'.format(ex))
+    onnx_file_path = export_onnx(model.eval(), cfg, args.output_name, args.disable_dyn_axes, True, args.opset, True)
+    if args.export_ir:
+        export_ir(onnx_file_path, cfg.data.norm_mean, cfg.data.norm_std, os.path.dirname(os.path.abspath(onnx_file_path)))
 
 
 if __name__ == '__main__':

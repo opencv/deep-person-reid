@@ -81,14 +81,19 @@ def main():
     aux_lr = cfg.train.lr # placeholder, needed for aux models, may be filled by nncf part below
     if is_nncf_used:
         print('Begin making NNCF changes in model')
-        model, cfg, aux_lr, nncf_metainfo = make_nncf_changes_in_training(model, cfg,
-                                                                          args.classes,
-                                                                          args.opts)
+        if cfg.use_gpu:
+            model.cuda()
+
+        compression_ctrl, model, cfg, aux_lr, nncf_metainfo = \
+            make_nncf_changes_in_training(model, cfg,
+                                          args.classes,
+                                          args.opts)
 
         should_freeze_aux_models = True
         print(f'should_freeze_aux_models = {should_freeze_aux_models}')
         print('End making NNCF changes in model')
     else:
+        compression_ctrl = None
         should_freeze_aux_models = False
         nncf_metainfo = None
     # creating optimizer and scheduler -- it should be done after NNCF part, since
@@ -165,7 +170,8 @@ def main():
                           initial_lr=aux_lr)
 
     log_dir = cfg.data.tb_log_dir if cfg.data.tb_log_dir else cfg.data.save_dir
-    engine.run(**engine_run_kwargs(cfg), tb_writer=SummaryWriter(log_dir=log_dir))
+    engine.run(**engine_run_kwargs(cfg), compression_ctrl=compression_ctrl,
+               tb_writer=SummaryWriter(log_dir=log_dir))
 
 
 if __name__ == '__main__':

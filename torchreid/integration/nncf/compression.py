@@ -1,9 +1,6 @@
-import numpy as np
 import os
-import sys
 from collections import OrderedDict
 from contextlib import contextmanager
-from PIL import Image
 from pprint import pformat
 
 import torch
@@ -20,7 +17,7 @@ def nullcontext():
 
 def get_no_nncf_trace_context_manager():
     try:
-        from nncf.dynamic_graph.context import \
+        from nncf.torch.dynamic_graph.context import \
             no_nncf_trace as original_no_nncf_trace
         return original_no_nncf_trace
     except ImportError:
@@ -60,7 +57,7 @@ def _load_checkpoint_for_nncf(model, filename, map_location=None, strict=False):
     Returns:
         dict or OrderedDict: The loaded checkpoint.
     """
-    from nncf import load_state
+    from nncf.torch import load_state
 
     checkpoint = torch.load(filename, map_location=map_location)
     # get state_dict from checkpoint
@@ -122,12 +119,13 @@ def wrap_nncf_model(model, cfg, datamanager_for_init,
         raise RuntimeError(f'One of datamanager_for_init or checkpoint_path should be set: '
                            f'datamanager_for_init={datamanager_for_init} checkpoint_path={checkpoint_path}')
 
-    import nncf
-    from nncf import (NNCFConfig, create_compressed_model,
-                      register_default_init_args)
-    from nncf.initialization import InitializingDataLoader
-    from nncf.dynamic_graph.io_handling import nncf_model_input
-    from nncf.dynamic_graph.trace_tensor import TracedTensor
+    from nncf import NNCFConfig
+
+    from nncf.torch import create_compressed_model
+    from nncf.torch.initialization import register_default_init_args
+    from nncf.torch.dynamic_graph.io_handling import nncf_model_input
+    from nncf.torch.dynamic_graph.trace_tensor import TracedTensor
+    from nncf.torch.initialization import PTInitializingDataLoader
 
     nncf_metainfo = _get_nncf_metainfo_from_checkpoint(checkpoint_path)
     if nncf_metainfo and nncf_metainfo.get('nncf_compression_enabled'):
@@ -169,7 +167,7 @@ def wrap_nncf_model(model, cfg, datamanager_for_init,
         # update it just to be on the safe side
         nncf_metainfo['nncf_config'] = nncf_config_data
 
-    class ReidInitializeDataLoader(InitializingDataLoader):
+    class ReidInitializeDataLoader(PTInitializingDataLoader):
         def get_inputs(self, dataloader_output):
             # define own InitializingDataLoader class using approach like
             # parse_data_for_train and parse_data_for_eval in the class Engine
@@ -228,6 +226,6 @@ def wrap_nncf_model(model, cfg, datamanager_for_init,
                                                       nncf_config,
                                                       dummy_forward_fn=dummy_forward,
                                                       wrap_inputs_fn=wrap_inputs,
-                                                      resuming_state_dict=resuming_state_dict)
+                                                      compression_state=resuming_state_dict)
 
     return compression_ctrl, model, nncf_metainfo

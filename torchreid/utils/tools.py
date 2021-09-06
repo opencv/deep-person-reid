@@ -154,9 +154,10 @@ def collect_env_info():
 
 def get_model_attr(model, attr):
     if hasattr(model, 'module'):
-        return getattr(model.module, attr)
-    else:
-        return getattr(model, attr)
+        model = model.module
+    if hasattr(model, 'nncf_module'):
+        return getattr(model.nncf_module, attr)
+    return getattr(model, attr)
 
 
 class StateCacher(object):

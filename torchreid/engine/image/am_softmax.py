@@ -223,6 +223,7 @@ class ImageAMSoftmaxEngine(Engine):
                 model_loss, model_loss_summary, model_avg_acc, model_logits = self._single_model_losses(
                     self.models[model_name], train_records, imgs, obj_ids, n_iter, model_name, num_packages
                 )
+
                 avg_acc += model_avg_acc / float(num_models)
                 total_loss += model_loss / float(num_models)
                 loss_summary.update(model_loss_summary)
@@ -253,7 +254,6 @@ class ImageAMSoftmaxEngine(Engine):
                 coeff_mutual_learning = int(not should_turn_off_mutual_learning)
 
                 total_loss += coeff_mutual_learning * mutual_loss / float(num_mutual_losses)
-
 
             total_loss.backward(retain_graph=self.enable_metric_losses)
 

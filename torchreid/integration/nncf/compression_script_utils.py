@@ -73,6 +73,7 @@ def make_nncf_changes_in_main_training_config(cfg, command_line_cfg_opts):
     nncf_training_config = cfg.get('nncf', {})
 
     nncf_changes_in_main_train_config = nncf_training_config.get('changes_in_main_train_config')
+    cfg.train.ema.enable = False # turn off the EMA model since it is useless when compressing
     if nncf_changes_in_main_train_config:
         _sanity_check_nncf_changes_in_config(nncf_changes_in_main_train_config)
 
@@ -147,7 +148,7 @@ def make_nncf_changes_in_training(model, cfg, classes, command_line_cfg_opts):
                                         is_initial_lr_set_from_opts)
     assert lr is not None
     cfg.train.lr = lr
-    return model, cfg, lr, nncf_metainfo
+    return compression_ctrl, model, cfg, lr, nncf_metainfo
 
 def make_nncf_changes_in_eval(model, cfg):
     # See details on nncf_training_config in the comment in
