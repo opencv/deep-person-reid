@@ -242,7 +242,7 @@ class ImageDataManager(DataManager):
             sampler=build_train_sampler(
                 train_dataset.train,
                 train_sampler,
-                batch_size=batch_size_train,
+                batch_size=max(1, min(batch_size_train, len(train_dataset))) ,
                 batch_num_instances=batch_num_instances,
                 epoch_num_instances=epoch_num_instances,
                 fill_instances=fill_instances,
@@ -268,7 +268,7 @@ class ImageDataManager(DataManager):
                 )
                 self.test_loader[name]['pairs'] = torch.utils.data.DataLoader(
                     lfw_data,
-                    batch_size=batch_size_test,
+                    batch_size=max(min(batch_size_test, len(lfw_data)), 1),
                     shuffle=False,
                     num_workers=workers,
                     pin_memory=self.use_gpu,
@@ -294,7 +294,7 @@ class ImageDataManager(DataManager):
                 )
                 self.test_loader[name]['query'] = torch.utils.data.DataLoader(
                     query_dataset,
-                    batch_size=batch_size_test,
+                    batch_size=max(min(batch_size_test, len(query_dataset)), 1),
                     shuffle=False,
                     num_workers=workers,
                     worker_init_fn=worker_init_fn,
@@ -321,7 +321,7 @@ class ImageDataManager(DataManager):
                 )
                 self.test_loader[name]['gallery'] = torch.utils.data.DataLoader(
                     gallery_dataset,
-                    batch_size=batch_size_test,
+                    batch_size=max(min(batch_size_test, len(gallery_dataset)), 1),
                     worker_init_fn=worker_init_fn,
                     shuffle=False,
                     num_workers=workers,

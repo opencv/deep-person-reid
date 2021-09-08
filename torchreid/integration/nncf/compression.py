@@ -229,3 +229,17 @@ def wrap_nncf_model(model, cfg, datamanager_for_init,
                                                       compression_state=resuming_state_dict)
 
     return compression_ctrl, model, nncf_metainfo
+
+def get_nncf_complession_stage():
+    try:
+        from nncf.api.compression import CompressionStage
+        return CompressionStage
+    except ImportError:
+        return lambda _: None
+
+def get_nncf_prepare_for_tensorboard():
+    try:
+        from nncf.common.utils.tensorboard import prepare_for_tensorboard
+        return prepare_for_tensorboard
+    except ImportError:
+        return lambda _: None
