@@ -1,4 +1,5 @@
 from __future__ import absolute_import
+from torchreid.models.transformer import Transformer
 
 from .efficient_net_pytcv import *
 from .inceptionv4_pytcv import *
@@ -10,6 +11,8 @@ from .osnet_fpn import *
 from .ptcv_wrapper import *
 from .tresnet import *
 from .resnet import *
+from .q2l import *
+from .transformer import *
 
 __model_factory = {
     # image classification models
@@ -53,7 +56,8 @@ __model_factory = {
     'mobile_face_net_se_2x': mobile_face_net_se_2x,
 }
 
-__model_factory = {**__model_factory, **wrapped_models}
+q2l_models = {'q2l_' + name : model for name, model in __model_factory.items()}
+__model_factory = {**__model_factory, **wrapped_models, **q2l_models}
 
 
 def show_avai_models():
@@ -63,7 +67,6 @@ def show_avai_models():
         >>> from torchreid import models
         >>> models.show_avai_models()
     """
-    print(list(__model_factory.keys()))
 
 
 def build_model(name, **kwargs):
@@ -82,4 +85,11 @@ def build_model(name, **kwargs):
     avai_models = list(__model_factory.keys())
     if name not in avai_models:
         raise KeyError('Unknown model: {}. Must be one of {}'.format(name, avai_models))
-    return __model_factory[name](**kwargs)
+    if name.startswith('q2l'):
+        backbone_name = name[4:]
+        backbone = __model_factory[backbone_name](**kwargs)
+        transformer = build_transformer(**kwargs)
+        model = build_q2l(backbone, transformer, **kwargs)
+    else:
+        model = __model_factory[name](**kwargs)
+    return model

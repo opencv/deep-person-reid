@@ -148,7 +148,6 @@ class Dataset:
             cams[dataset_id].add(record[2])
         num_pids = {dataset_id: len(dataset_pids) for dataset_id, dataset_pids in pids.items()}
         num_cams = {dataset_id: len(dataset_cams) for dataset_id, dataset_cams in cams.items()}
-
         return num_pids, num_cams
 
     def get_num_pids(self, data):

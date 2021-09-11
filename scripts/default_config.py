@@ -132,8 +132,8 @@ def get_default_config():
     cfg.train.gamma = 0.1  # learning rate decay multiplier
     cfg.train.first_cycle_steps = 5
     cfg.train.cycle_mult = 1.
-    cfg.train.min_lr = 1e-5
-    cfg.train.max_lr = 0.1
+    cfg.train.min_lr = [1e-5]
+    cfg.train.max_lr = [0.1]
     cfg.train.lr_decay_factor = 100
     cfg.train.pct_start = 0.3
     cfg.train.fixbase_epoch = 0

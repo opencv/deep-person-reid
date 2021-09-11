@@ -129,8 +129,16 @@ def _build_optim(model,
     # we switch off nbd when lr_finder enabled
     # because optimizer builded once and lr in biases isn't changed
     elif nbd and not lr_finder:
+        from tqdm import tqdm
         decay, bias_no_decay, weight_no_decay = [], [], []
-        for m in model.modules():
+        # for name, param in model.named_parameters():
+        #     if not param.requires_grad:
+        #         continue  # frozen weights
+        #     print(name)
+            # if len(param.shape) == 1 or name.endswith(".bias") or name in skip_list:
+            #     no_decay.append(param)
+
+        for m in tqdm(model.modules()):
             if isinstance(m, nn.Conv2d) or isinstance(m, nn.Linear):
                 decay.append(m.weight)
                 if m.bias is not None:
@@ -143,8 +151,29 @@ def _build_optim(model,
             elif len(list(m.children())) == 0:
                 for p in m.parameters():
                     decay.append(p)
-        assert len(list(model.parameters())) == len(decay) + len(bias_no_decay) + len(weight_no_decay)
 
+            # else:
+            #     for p in m.modules():
+            #         if isinstance(p, nn.Conv2d) or isinstance(p, nn.Linear):
+            #             decay.append(p.weight)
+            #             if p.bias is not None:
+            #                 bias_no_decay.append(p.bias)
+            #         elif hasattr(p, 'weight') or hasattr(p, 'bias'):
+            #             if hasattr(p, 'weight'):
+            #                 weight_no_decay.append(p.weight)
+            #             if hasattr(p, 'bias'):
+            #                 bias_no_decay.append(p.bias)
+            # else:
+            #     print(len(list(m.children())))
+                # for p in m:
+                #     print(p)
+                #     if hasattr(p, 'weight'):
+                #         weight_no_decay.append(p.weight)
+                #     if hasattr(p, 'bias'):
+                #         bias_no_decay.append(p.bias)
+
+        print(len(list(model.parameters())), len(decay) + len(bias_no_decay) + len(weight_no_decay), len(decay),len(bias_no_decay),len(weight_no_decay))
+        assert len(list(model.parameters())) == len(decay) + len(bias_no_decay) + len(weight_no_decay)
         param_groups = [{'params': decay, 'lr': lr, 'weight_decay': weight_decay},
                         {'params': bias_no_decay, 'lr': 2 * lr, 'weight_decay': 0.0},
                         {'params': weight_no_decay, 'lr': lr, 'weight_decay': 0.0}]

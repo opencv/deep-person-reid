@@ -9,10 +9,12 @@ class TResnetTimm(ModelInterface):
                 dropout_cls = None,
                 lr_finder=None,
                 num_classes=1000,
+                num_features=2432,
                 **kwargs):
         super().__init__(**kwargs)
         dropout_rate = dropout_cls.p
         self.lr_finder = lr_finder
+        self.num_features = num_features
         self.model = timm.create_model('tresnet_m',
                                         pretrained=pretrained,
                                         num_classes=num_classes,

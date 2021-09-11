@@ -300,6 +300,7 @@ class EfficientNet(ModelInterface):
         self.lr_finder = lr_finder
 
         self.feature_dim = feature_dim
+        self.num_features = feature_dim
         assert self.feature_dim is not None and self.feature_dim > 0
 
         activation = "swish"
