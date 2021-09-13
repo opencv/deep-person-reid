@@ -76,21 +76,25 @@ def export_onnx(model, cfg, output_file_path='model', disable_dyn_axes=True,
 
 
 def export_ir(onnx_model_path, norm_mean=[0,0,0], norm_std=[1,1,1], optimized_model_dir='./ir_model', data_type='FP32'):
+    def get_mo_cmd():
+        for mo_cmd in ('mo', 'mo.py'):
+            try:
+                run(f'{mo_cmd} -h', stdout=DEVNULL, stderr=DEVNULL, shell=True, check=True)
+                return mo_cmd
+            except CalledProcessError:
+                pass
+        raise RuntimeError('OpenVINO Model Optimizer is not found or configured improperly')
+
     mean_values = str([s*255 for s in norm_mean])
     scale_values = str([s*255 for s in norm_std])
 
-    command_line = f'mo.py --input_model="{onnx_model_path}" ' \
+    mo_cmd = get_mo_cmd()
+
+    command_line = f'{mo_cmd} --input_model="{onnx_model_path}" ' \
                     f'--mean_values="{mean_values}" ' \
                     f'--scale_values="{scale_values}" ' \
                     f'--output_dir="{optimized_model_dir}" ' \
                     f'--data_type {data_type} ' \
                     '--reverse_input_channels'
-
-    try:
-        run('mo.py -h', stdout=DEVNULL, stderr=DEVNULL, shell=True, check=True)
-    except CalledProcessError as _:
-        print('OpenVINO Model Optimizer not found, please source '
-            'openvino/bin/setupvars.sh before running this script.')
-        return
 
     run(command_line, shell=True, check=True)

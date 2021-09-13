@@ -1,0 +1,2 @@
+openvino==2021.4
+openvino-dev==2021.4
