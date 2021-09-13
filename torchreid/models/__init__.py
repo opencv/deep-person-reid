@@ -60,15 +60,6 @@ q2l_models = {'q2l_' + name : model for name, model in __model_factory.items()}
 __model_factory = {**__model_factory, **wrapped_models, **q2l_models}
 
 
-def show_avai_models():
-    """Displays available models.
-
-    Examples::
-        >>> from torchreid import models
-        >>> models.show_avai_models()
-    """
-
-
 def build_model(name, **kwargs):
     """A function wrapper for building a model.
 

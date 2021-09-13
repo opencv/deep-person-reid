@@ -182,7 +182,6 @@ class MobileNetV3(MobileNetV3Base):
         # setting of inverted residual blocks
         self.cfgs = cfgs
         assert mode in ['large', 'small']
-        # features before GAP
         # building first layer
         input_channel = make_divisible(16 * self.width_mult, 8)
         stride = 1 if self.in_size[0] < 100 else 2

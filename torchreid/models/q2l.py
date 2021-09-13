@@ -1,13 +1,8 @@
-import os, sys
-import os.path as osp
-
 import torch
 import torch.nn as nn
-import torch.distributed as dist
-import numpy as np
 import math
 
-from .transformer import build_transformer, build_position_encoding
+from .transformer import build_position_encoding
 from .common import ModelInterface
 
 class GroupWiseLinear(nn.Module):
@@ -73,32 +68,26 @@ class Qeruy2Label(ModelInterface):
     def __init__(self,
                 backbone,
                 transfomer,
-                pretrained=False,
-                dropout_cls = None,
                 lr_finder=None,
-                num_classes=1000,
-                num_features=2432,
+                num_classes=80,
                 **kwargs):
         """[summary]
 
         Args:
             backbone ([type]): backbone model.
             transfomer ([type]): transformer model.
-            num_class ([type]): number of classes. (80 for MSCOCO).
+            num_classes ([type]): number of classes. (80 for MSCOCO).
         """
-        print(kwargs)
         super().__init__(**kwargs)
         self.backbone = backbone
         self.transformer = transfomer
         self.num_class = num_classes
         self.lr_finder = lr_finder
-        print(num_classes)
         assert self.loss in ['softmax', 'asl', 'bce'], "Q2L supports only softmax or ASL losses"
 
         # assert not (self.ada_fc and self.emb_fc), "ada_fc and emb_fc cannot be True at the same time."
 
         hidden_dim = transfomer.d_model
-        print(backbone.num_channels, hidden_dim)
         self.input_proj = nn.Conv2d(backbone.num_channels, hidden_dim, kernel_size=1)
         self.query_embed = nn.Embedding(num_classes, hidden_dim)
         self.fc = GroupWiseLinear(num_classes, hidden_dim, use_bias=True)
@@ -130,9 +119,8 @@ class Qeruy2Label(ModelInterface):
         return chain(self.transformer.parameters(), self.fc.parameters(), self.input_proj.parameters(), self.query_embed.parameters())
 
 
-def build_q2l(backbone, transformer, hidden_dim=2432,
-                position_embedding='sine', img_size=448, **kwargs):
-    position_emb = build_position_encoding(hidden_dim=hidden_dim, position_embedding=position_embedding, img_size=img_size)
+def build_q2l(backbone, transformer, hidden_dim=2048, input_size=448, **kwargs):
+    position_emb = build_position_encoding(hidden_dim=hidden_dim, img_size=input_size)
     wrapped_model = BackboneWrapper(backbone, position_emb)
     model = Qeruy2Label(
         backbone=wrapped_model,

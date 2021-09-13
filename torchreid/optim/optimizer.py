@@ -131,48 +131,32 @@ def _build_optim(model,
     elif nbd and not lr_finder:
         from tqdm import tqdm
         decay, bias_no_decay, weight_no_decay = [], [], []
-        # for name, param in model.named_parameters():
-        #     if not param.requires_grad:
-        #         continue  # frozen weights
-        #     print(name)
-            # if len(param.shape) == 1 or name.endswith(".bias") or name in skip_list:
-            #     no_decay.append(param)
+        # for m in tqdm(model.modules()):
+        #     if isinstance(m, nn.Conv2d) or isinstance(m, nn.Linear):
+        #         decay.append(m.weight)
+        #         if m.bias is not None:
+        #             bias_no_decay.append(m.bias)
+        #     elif hasattr(m, 'weight') or hasattr(m, 'bias'):
+        #         if hasattr(m, 'weight'):
+        #             weight_no_decay.append(m.weight)
+        #         if hasattr(m, 'bias'):
+        #             bias_no_decay.append(m.bias)
+        #     elif len(list(m.children())) == 0:
+        #         for p in m.parameters():
+        #             decay.append(p)
 
-        for m in tqdm(model.modules()):
-            if isinstance(m, nn.Conv2d) or isinstance(m, nn.Linear):
-                decay.append(m.weight)
-                if m.bias is not None:
-                    bias_no_decay.append(m.bias)
-            elif hasattr(m, 'weight') or hasattr(m, 'bias'):
-                if hasattr(m, 'weight'):
-                    weight_no_decay.append(m.weight)
-                if hasattr(m, 'bias'):
-                    bias_no_decay.append(m.bias)
-            elif len(list(m.children())) == 0:
-                for p in m.parameters():
-                    decay.append(p)
+        for name, param in model.named_parameters():
+            if not param.requires_grad:
+                continue  # frozen weights
+            if name.endswith("bias"):
+                bias_no_decay.append(param)
+            elif len(param.shape) == 1:
+                weight_no_decay.append(param)
+            elif (name.endswith("weight") and ("norm" in name or "query_embed" in name)):
+                weight_no_decay.append(param)
+            else:
+                decay.append(param)
 
-            # else:
-            #     for p in m.modules():
-            #         if isinstance(p, nn.Conv2d) or isinstance(p, nn.Linear):
-            #             decay.append(p.weight)
-            #             if p.bias is not None:
-            #                 bias_no_decay.append(p.bias)
-            #         elif hasattr(p, 'weight') or hasattr(p, 'bias'):
-            #             if hasattr(p, 'weight'):
-            #                 weight_no_decay.append(p.weight)
-            #             if hasattr(p, 'bias'):
-            #                 bias_no_decay.append(p.bias)
-            # else:
-            #     print(len(list(m.children())))
-                # for p in m:
-                #     print(p)
-                #     if hasattr(p, 'weight'):
-                #         weight_no_decay.append(p.weight)
-                #     if hasattr(p, 'bias'):
-                #         bias_no_decay.append(p.bias)
-
-        print(len(list(model.parameters())), len(decay) + len(bias_no_decay) + len(weight_no_decay), len(decay),len(bias_no_decay),len(weight_no_decay))
         assert len(list(model.parameters())) == len(decay) + len(bias_no_decay) + len(weight_no_decay)
         param_groups = [{'params': decay, 'lr': lr, 'weight_decay': weight_decay},
                         {'params': bias_no_decay, 'lr': 2 * lr, 'weight_decay': 0.0},

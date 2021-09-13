@@ -66,6 +66,16 @@ def get_default_config():
     cfg.model.self_challenging_cfg.enable = False
     cfg.model.self_challenging_cfg.drop_p = 0.33
     cfg.model.self_challenging_cfg.drop_batch_p = 0.33
+    cfg.model.transformer = CN()
+    cfg.model.transformer.hidden_dim = 2432
+    cfg.model.transformer.dim_feedforward = 2432
+    cfg.model.transformer.dropout = 0.1
+    cfg.model.transformer.nheads = 4
+    cfg.model.transformer.num_encoder_layers = 1
+    cfg.model.transformer.num_decoder_layers = 2
+    cfg.model.transformer.pre_norm = False
+    cfg.model.transformer.rm_self_attn_dec = True
+    cfg.model.transformer.rm_first_self_attn = True
 
     # mutual learning, auxiliary model
     cfg.mutual_learning = CN()
@@ -598,6 +608,15 @@ def model_kwargs(cfg, num_classes):
         'attr_num_classes': cfg.attr_loss.num_classes,
         'type': cfg.model.type,
         'self_challenging_cfg': cfg.model.self_challenging_cfg,
+        'hidden_dim': cfg.model.transformer.hidden_dim,
+        'dropout': cfg.model.transformer.dropout,
+        'nheads': cfg.model.transformer.nheads,
+        'dim_feedforward': cfg.model.transformer.dim_feedforward,
+        'num_encoder_layers': cfg.model.transformer.num_encoder_layers,
+        'num_decoder_layers': cfg.model.transformer.num_decoder_layers,
+        'pre_norm': cfg.model.transformer.pre_norm,
+        'rm_self_attn_dec': cfg.model.transformer.rm_self_attn_dec,
+        'rm_first_self_attn': cfg.model.transformer.rm_first_self_attn,
     }
 
 

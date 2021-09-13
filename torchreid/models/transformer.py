@@ -12,7 +12,7 @@ Copy-paste from torch.nn.Transformer with modifications:
     * using modified multihead attention from nn_multiheadattention.py
 """
 import copy
-from typing import Optional
+from typing import Optional, Tuple
 
 import torch
 import torch.nn.functional as F
@@ -67,17 +67,15 @@ class PositionEmbeddingSine(nn.Module):
         return self.pe.repeat((x.size(0),1,1,1))
 
 
-def build_position_encoding(hidden_dim, position_embedding='sine', img_size=448):
+def build_position_encoding(hidden_dim, img_size=448):
     N_steps = hidden_dim // 2
     downsample_ratio = 32
-    if position_embedding in ('v2', 'sine'):
-        # TODO find a better way of exposing other arguments
-        assert img_size % 32 == 0, "args.img_size ({}) % 32 != 0".format(img_size)
-        position_embedding = PositionEmbeddingSine(N_steps, normalize=True, maxH=img_size // downsample_ratio, maxW=img_size // downsample_ratio)
-    else:
-        raise ValueError(f"not supported {position_embedding}")
-
-    return position_embedding
+    if isinstance(img_size, (tuple, list)):
+        assert img_size[0] == img_size[1], "Q2L supports square image only"
+        img_size = img_size[0]
+    assert img_size % 32 == 0, "args.img_size ({}) % 32 != 0".format(img_size)
+    return PositionEmbeddingSine(N_steps, normalize=True,
+                            maxH=img_size // downsample_ratio, maxW=img_size // downsample_ratio)
 
 
 class Transformer(nn.Module):
@@ -408,6 +406,7 @@ class TransformerDecoderLayer(nn.Module):
 def build_transformer(hidden_dim=2432, dropout=0.1, nheads=4, dim_feedforward=2432,
                         num_encoder_layers=1, num_decoder_layers=2, pre_norm=False,
                          rm_self_attn_dec=True, rm_first_self_attn=True, **rwargs):
+
     return Transformer(
         d_model=hidden_dim,
         dropout=dropout,
