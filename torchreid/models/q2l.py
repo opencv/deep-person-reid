@@ -104,12 +104,15 @@ class Qeruy2Label(ModelInterface):
         if not self.training:
             return [logits]
 
-        elif self.loss in ['asl']:
+        elif self.loss in ['asl', 'bce']:
+            if self.lr_finder.enable and self.lr_finder.mode == 'fast_ai':
+                out_data = logits
+            else:
                 out_data = [logits]
         else:
             raise KeyError("Unsupported loss: {}".format(self.loss))
 
-        if self.lr_finder.enable and self.lr_finder.lr_find_mode == 'automatic':
+        if self.lr_finder.enable and self.lr_finder.mode == 'fast_ai':
             return out_data
         return tuple(out_data)
 

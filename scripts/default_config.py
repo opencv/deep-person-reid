@@ -18,7 +18,7 @@ def get_default_config():
     cfg.lr_finder.mode = 'fast_ai'
     cfg.lr_finder.max_lr = 0.03
     cfg.lr_finder.min_lr = 0.004
-    cfg.lr_finder.step = 0.001
+    cfg.lr_finder.step = None
     cfg.lr_finder.num_epochs = 3
     cfg.lr_finder.epochs_warmup = 2
     cfg.lr_finder.stop_after = False

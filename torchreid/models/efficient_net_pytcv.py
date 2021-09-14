@@ -390,7 +390,7 @@ class EfficientNet(ModelInterface):
         if get_embeddings:
             out_data = [logits, glob_features.view(x.shape[0], -1)]
         elif self.loss in ['softmax', 'am_softmax', 'asl', 'am_binary']:
-            if self.lr_finder.enable and self.lr_finder.mode == 'automatic':
+            if self.lr_finder.enable and self.lr_finder.mode == 'fast_ai':
                 out_data = logits
             else:
                 out_data = [logits]
@@ -400,7 +400,7 @@ class EfficientNet(ModelInterface):
         else:
             raise KeyError("Unsupported loss: {}".format(self.loss))
 
-        if self.lr_finder.enable and self.lr_finder.mode == 'automatic':
+        if self.lr_finder.enable and self.lr_finder.mode == 'fast_ai':
             return out_data
         return tuple(out_data)
 

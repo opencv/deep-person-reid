@@ -689,7 +689,7 @@ class InceptionV4(ModelInterface):
         if get_embeddings:
             out_data = [logits, glob_features]
         elif self.loss in ['softmax', 'am_softmax', 'asl', 'am-asl']:
-            if self.lr_finder.enable and self.lr_finder.lr_find_mode == 'automatic':
+            if self.lr_finder.enable and self.lr_finder.mode == 'fast_ai':
                 out_data = logits
             else:
                 out_data = [logits]
@@ -698,7 +698,7 @@ class InceptionV4(ModelInterface):
         else:
             raise KeyError("Unsupported loss: {}".format(self.loss))
 
-        if self.lr_finder.enable and self.lr_finder.lr_find_mode == 'automatic':
+        if self.lr_finder.enable and self.lr_finder.mode == 'fast_ai':
             return out_data
         return tuple(out_data)
 
