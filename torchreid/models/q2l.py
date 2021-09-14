@@ -83,9 +83,8 @@ class Qeruy2Label(ModelInterface):
         self.transformer = transfomer
         self.num_class = num_classes
         self.lr_finder = lr_finder
-        assert self.loss in ['softmax', 'asl', 'bce'], "Q2L supports only softmax or ASL losses"
-
-        # assert not (self.ada_fc and self.emb_fc), "ada_fc and emb_fc cannot be True at the same time."
+        assert self.loss in ['asl', 'bce'], "Q2L supports only ASL or BCE losses"
+        assert self.is_classification(), "Q2L model is adapted for multilabel setup only"
 
         hidden_dim = transfomer.d_model
         self.input_proj = nn.Conv2d(backbone.num_channels, hidden_dim, kernel_size=1)
@@ -101,11 +100,11 @@ class Qeruy2Label(ModelInterface):
         query_input = self.query_embed.weight
         hs = self.transformer(self.input_proj(src), query_input, pos)[0] # B,K,d
         logits = self.fc(hs[-1])
-        # import ipdb; ipdb.set_trace()
-        if not self.training and self.is_classification():
+
+        if not self.training:
             return [logits]
 
-        elif self.loss in ['softmax', 'am_softmax', 'asl']:
+        elif self.loss in ['asl']:
                 out_data = [logits]
         else:
             raise KeyError("Unsupported loss: {}".format(self.loss))

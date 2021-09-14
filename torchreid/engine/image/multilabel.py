@@ -226,6 +226,6 @@ class MultilabelEngine(Engine):
         if current_metric >= self.best_metric:
             self.best_metric = current_metric
             is_candidate_for_best = True
-
+        print(f"DEBUG::self.iter_to_wait={self.iter_to_wait}, current_metric: {current_metric}, self.best_metric: {self.best_metric}, current smooth_top1: {smooth_top1}, self.prev_smooth_top1: {self.prev_smooth_top1}")
         self.prev_smooth_top1 = smooth_top1
         return should_exit, is_candidate_for_best

@@ -130,8 +130,6 @@ class Transformer(nn.Module):
 
             total_modifie_layer_num += 1
             rm_list.append(idx)
-        # remove some self-attention layer
-        # print("rm {} layer: {}".format(total_modifie_layer_num, rm_list))
 
     def set_debug_mode(self, status):
         print("set debug mode to {}!!!".format(status))
