@@ -16,7 +16,7 @@ from .transformer import *
 
 __model_factory = {
     # image classification models
-    'inceptionv4_pytcv': inceptionv4_pytcv,
+    'inceptionv4': inceptionv4_pytcv,
     'mobilenetv3_small': mobilenetv3_small,
     'mobilenetv3_large': mobilenetv3_large,
     'mobilenetv3_large_075': mobilenetv3_large_075,

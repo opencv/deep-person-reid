@@ -7,12 +7,10 @@ class TResnetTimm(ModelInterface):
     def __init__(self,
                 pretrained=False,
                 dropout_cls = None,
-                lr_finder=None,
                 num_classes=1000,
                 **kwargs):
         super().__init__(**kwargs)
         dropout_rate = dropout_cls.p
-        self.lr_finder = lr_finder
         self.model = timm.create_model('tresnet_m',
                                         pretrained=pretrained,
                                         num_classes=num_classes,
@@ -32,15 +30,10 @@ class TResnetTimm(ModelInterface):
             return [logits]
 
         elif self.loss in ['softmax', 'am_softmax', 'asl']:
-            if self.lr_finder.enable and self.lr_finder.mode == 'fast_ai':
-                out_data = logits
-            else:
                 out_data = [logits]
         else:
             raise KeyError("Unsupported loss: {}".format(self.loss))
 
-        if self.lr_finder.enable and self.lr_finder.mode == 'fast_ai':
-            return out_data
         return tuple(out_data)
 
 def tresnet(pretrained=False, **kwargs):

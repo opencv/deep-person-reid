@@ -1,6 +1,5 @@
 from functools import partial
 
-import torch
 import numpy as np
 from torch_lr_finder import LRFinder
 import optuna
@@ -11,6 +10,50 @@ import time
 import datetime
 
 from torchreid.utils import get_model_attr
+from torchreid.optim import SAM
+
+
+class WrappedLRFinder(LRFinder):
+    def _train_batch(self, train_iter, accumulation_steps, non_blocking_transfer=True):
+        self.model.train()
+        total_loss = None  # for late initialization
+
+        self.optimizer.zero_grad()
+        for _ in range(accumulation_steps):
+            inputs, labels = next(train_iter)
+            inputs, labels = self._move_to_device(
+                inputs, labels, non_blocking=non_blocking_transfer
+            )
+            # Forward pass
+            loss = self.forward_pass(inputs, labels, accumulation_steps)
+
+            if not isinstance(self.optimizer, SAM):
+                self.optimizer.step()
+            else:
+                self.optimizer.first_step()
+                loss = self.forward_pass(inputs, labels, accumulation_steps)
+                self.optimizer.second_step()
+
+            if total_loss is None:
+                total_loss = loss
+            else:
+                total_loss += loss
+
+        return total_loss.item()
+
+    def forward_pass(self, inputs, targets, accumulation_steps):
+        # Forward pass
+        model_output = self.model(inputs)
+        all_logits = model_output[0] if isinstance(model_output, (tuple, list)) else model_output
+        loss = self.criterion(all_logits, targets)
+
+        # Loss should be averaged in each step
+        loss /= accumulation_steps
+
+        # Backward pass
+        loss.backward()
+        return loss
+
 
 class LrFinder:
     def __init__(self,
@@ -72,12 +115,7 @@ class LrFinder:
         return lr
 
     def fast_ai(self):
-        wd = self.optimizer.param_groups[0]['weight_decay']
         criterion = self.engine.main_losses[0]
-        if self.enable_sam:
-            optimizer = torch.optim.SGD(self.model.parameters(), lr=self.min_lr, weight_decay=wd)
-        else:
-            optimizer = self.optimizer
 
         if self.epochs_warmup != 0:
             get_model_attr(self.model, 'to')(self.model_device)
@@ -87,7 +125,7 @@ class LrFinder:
 
         # run lr finder
         num_iter = len(self.engine.train_loader)
-        lr_finder = LRFinder(self.model, optimizer, criterion, device=self.model_device)
+        lr_finder = WrappedLRFinder(self.model, self.optimizer, criterion, device=self.model_device)
         lr_finder.range_test(self.engine.train_loader, start_lr=self.min_lr, end_lr=self.max_lr,
                                 smooth_f=self.smooth_f, num_iter=num_iter, step_mode='exp')
         ax, optim_lr = lr_finder.plot(suggest_lr=True)

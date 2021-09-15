@@ -595,16 +595,13 @@ class InceptionV4(ModelInterface):
                  in_size=(224, 224),
                  num_classes=1000,
                  dropout_cls = None,
-                 dropout_cfg = None,
                  pooling_type='avg',
                  bn_eval=False,
                  bn_frozen=False,
-                 feature_dim=1536,
                  loss='softmax',
                  IN_first=False,
                  IN_conv1=False,
                  self_challenging_cfg=False,
-                 lr_finder = None,
                  **kwargs):
 
         super().__init__(**kwargs)
@@ -615,9 +612,8 @@ class InceptionV4(ModelInterface):
         self.bn_frozen = bn_frozen
         self.pooling_type = pooling_type
         self.loss = loss
-        self.feature_dim = feature_dim
         self.self_challenging_cfg = self_challenging_cfg
-        self.lr_finder = lr_finder
+        self.num_features = 1536
 
         layers = [4, 8, 4]
         normal_units = [InceptionAUnit, InceptionBUnit, InceptionCUnit]
@@ -642,18 +638,18 @@ class InceptionV4(ModelInterface):
             self.output.add_module("dropout", Dropout(**dropout_cls))
         if self.loss in ['softmax', 'asl']:
             self.output.add_module("fc", nn.Linear(
-                in_features=self.feature_dim,
+                in_features=self.num_features,
                 out_features=num_classes))
         else:
             assert self.loss in ['am_softmax', 'am_binary']
             self.output.add_module("asl", AngleSimpleLinear(
-                in_features=self.feature_dim,
+                in_features=self.num_features,
                 out_features=num_classes))
 
         self._init_params()
 
     def _init_params(self):
-        for name, module in self.named_modules():
+        for _, module in self.named_modules():
             if isinstance(module, nn.Conv2d):
                 init.kaiming_uniform_(module.weight)
                 if module.bias is not None:
@@ -689,51 +685,18 @@ class InceptionV4(ModelInterface):
         if get_embeddings:
             out_data = [logits, glob_features]
         elif self.loss in ['softmax', 'am_softmax', 'asl', 'am-asl']:
-            if self.lr_finder.enable and self.lr_finder.mode == 'fast_ai':
-                out_data = logits
-            else:
                 out_data = [logits]
         elif self.loss in ['triplet']:
             out_data = [logits, glob_features]
         else:
             raise KeyError("Unsupported loss: {}".format(self.loss))
 
-        if self.lr_finder.enable and self.lr_finder.mode == 'fast_ai':
-            return out_data
         return tuple(out_data)
 
 
-def get_inceptionv4(model_name=None,
-                    pretrained=False,
-                    root=os.path.join("~", ".torch", "models"),
-                    **kwargs):
-    """
-    Create InceptionV4 model with specific parameters.
-    Parameters:
-    ----------
-    model_name : str or None, default None
-        Model name for loading pretrained model.
-    pretrained : bool, default False
-        Whether to load the pretrained weights for model.
-    root : str, default '~/.torch/models'
-        Location for keeping the model parameters.
-    """
-
-    net = InceptionV4(**kwargs)
-
-    if pretrained:
-        if (model_name is None) or (not model_name):
-            raise ValueError("Parameter `model_name` should be properly initialized for loading pretrained model.")
-        from .model_store import download_model
-        download_model(
-            net=net,
-            model_name=model_name,
-            local_model_store_dir_path=root)
-
-    return net
-
-
-def inceptionv4_pytcv(**kwargs):
+def inceptionv4_pytcv(pretrained=False,
+                      root=os.path.join("~", ".torch", "models"),
+                      **kwargs):
     """
     InceptionV4 model from 'Inception-v4, Inception-ResNet and the Impact of Residual Connections on Learning,'
     https://arxiv.org/abs/1602.07261.
@@ -744,7 +707,15 @@ def inceptionv4_pytcv(**kwargs):
     root : str, default '~/.torch/models'
         Location for keeping the model parameters.
     """
-    return get_inceptionv4(model_name="inceptionv4", **kwargs)
+    net = InceptionV4(**kwargs)
+    model_name = 'inceptionv4'
+    if pretrained:
+        from .model_store import download_model
+        download_model(
+            net=net,
+            model_name=model_name,
+            local_model_store_dir_path=root)
+    return net
 
 
 def _calc_width(net):

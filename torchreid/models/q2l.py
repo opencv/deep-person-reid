@@ -50,25 +50,10 @@ class BackboneWrapper(nn.Module):
         return [out], [pos]
 
 
-class BackboneWrapper(nn.Module):
-    def __init__(self, backbone, position_embedding):
-        super().__init__()
-        self.backbone = backbone
-        self.position_embedding = position_embedding
-        self.num_channels = backbone.num_features
-        # self.args = args
-
-    def forward(self, input):
-        out = self.backbone(input, return_featuremaps=True)
-        pos = self.position_embedding(out).to(out.dtype)
-        return [out], [pos]
-
-
 class Qeruy2Label(ModelInterface):
     def __init__(self,
                 backbone,
                 transfomer,
-                lr_finder=None,
                 num_classes=80,
                 **kwargs):
         """[summary]
@@ -82,12 +67,12 @@ class Qeruy2Label(ModelInterface):
         self.backbone = backbone
         self.transformer = transfomer
         self.num_class = num_classes
-        self.lr_finder = lr_finder
         assert self.loss in ['asl', 'bce'], "Q2L supports only ASL or BCE losses"
         assert self.is_classification(), "Q2L model is adapted for multilabel setup only"
 
-        hidden_dim = transfomer.d_model
-        self.input_proj = nn.Conv2d(backbone.num_channels, hidden_dim, kernel_size=1)
+        hidden_dim = transfomer.get_hidden_dim()
+        backbone_features = backbone.get_num_features()
+        self.input_proj = nn.Conv2d(backbone_features, hidden_dim, kernel_size=1)
         self.query_embed = nn.Embedding(num_classes, hidden_dim)
         self.fc = GroupWiseLinear(num_classes, hidden_dim, use_bias=True)
 
@@ -105,15 +90,10 @@ class Qeruy2Label(ModelInterface):
             return [logits]
 
         elif self.loss in ['asl', 'bce']:
-            if self.lr_finder.enable and self.lr_finder.mode == 'fast_ai':
-                out_data = logits
-            else:
                 out_data = [logits]
         else:
             raise KeyError("Unsupported loss: {}".format(self.loss))
 
-        if self.lr_finder.enable and self.lr_finder.mode == 'fast_ai':
-            return out_data
         return tuple(out_data)
 
     def finetune_paras(self):

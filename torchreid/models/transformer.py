@@ -143,6 +143,8 @@ class Transformer(nn.Module):
                 layer.debug_mode = status
                 layer.debug_name = str(idx)
 
+    def get_hidden_dim(self):
+        return self.d_model
 
     def _reset_parameters(self):
         for p in self.parameters():

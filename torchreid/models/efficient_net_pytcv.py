@@ -284,10 +284,8 @@ class EfficientNet(ModelInterface):
                  pooling_type='avg',
                  bn_eval=False,
                  bn_frozen=False,
-                 feature_dim=256,
                  IN_first=False,
                  IN_conv1=False,
-                 lr_finder = None,
                  **kwargs):
 
         super().__init__(**kwargs)
@@ -297,12 +295,7 @@ class EfficientNet(ModelInterface):
         self.bn_eval = bn_eval
         self.bn_frozen = bn_frozen
         self.pooling_type = pooling_type
-        self.lr_finder = lr_finder
-
-        self.feature_dim = feature_dim
-        self.num_features = feature_dim
-        assert self.feature_dim is not None and self.feature_dim > 0
-
+        self.num_features = final_block_channels
         activation = "swish"
         self.features = nn.Sequential()
         self.features.add_module("init_block", EffiInitBlock(
@@ -348,19 +341,18 @@ class EfficientNet(ModelInterface):
             out_channels=final_block_channels,
             bn_eps=bn_eps,
             activation=activation))
-        in_channels = final_block_channels
 
         self.output = nn.Sequential()
         if dropout_cls:
             self.output.add_module("dropout", Dropout(**dropout_cls))
         if self.loss in ['softmax', 'asl']:
             self.output.add_module("fc", nn.Linear(
-                in_features=in_channels,
+                in_features=final_block_channels,
                 out_features=num_classes))
         else:
             assert self.loss in ['am_softmax', 'am_binary']
             self.output.add_module("asl", AngleSimpleLinear(
-                in_features=in_channels,
+                in_features=final_block_channels,
                 out_features=num_classes))
 
         self._init_params()
@@ -381,7 +373,6 @@ class EfficientNet(ModelInterface):
             return y
 
         glob_features = self._glob_feature_vector(y, self.pooling_type, reduce_dims=False)
-
         logits = self.output(glob_features.view(x.shape[0], -1))
 
         if not self.training and self.is_classification():
@@ -390,9 +381,6 @@ class EfficientNet(ModelInterface):
         if get_embeddings:
             out_data = [logits, glob_features.view(x.shape[0], -1)]
         elif self.loss in ['softmax', 'am_softmax', 'asl', 'am_binary']:
-            if self.lr_finder.enable and self.lr_finder.mode == 'fast_ai':
-                out_data = logits
-            else:
                 out_data = [logits]
 
         elif self.loss in ['triplet']:
@@ -400,8 +388,6 @@ class EfficientNet(ModelInterface):
         else:
             raise KeyError("Unsupported loss: {}".format(self.loss))
 
-        if self.lr_finder.enable and self.lr_finder.mode == 'fast_ai':
-            return out_data
         return tuple(out_data)
 
 

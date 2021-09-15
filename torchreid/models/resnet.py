@@ -11,19 +11,18 @@ class ResnetTimm(ModelInterface):
                 model_name,
                 pretrained=False,
                 dropout_cls = None,
-                lr_finder=None,
                 num_classes=1000,
                 pooling_type='avg',
                 **kwargs):
         super().__init__(**kwargs)
         dropout_rate = dropout_cls.p
-        self.lr_finder = lr_finder
         self.pooling_type = pooling_type
         self.dropout = Dropout(**dropout_cls)
         self.model = timm.create_model(model_name,
                                         pretrained=pretrained,
                                         num_classes=num_classes,
                                         drop_rate=dropout_rate)
+        self.num_features = self.model.num_features
         assert self.loss in ['softmax', 'asl'], "Resnet supports only softmax or ASL losses"
 
     def forward(self, x, return_featuremaps=False, get_embeddings=False, gt_labels=None):
@@ -40,15 +39,10 @@ class ResnetTimm(ModelInterface):
             return [logits]
 
         elif self.loss in ['softmax', 'am_softmax', 'asl']:
-            if self.lr_finder.enable and self.lr_finder.mode == 'fast_ai':
-                out_data = logits
-            else:
                 out_data = [logits]
         else:
             raise KeyError("Unsupported loss: {}".format(self.loss))
 
-        if self.lr_finder.enable and self.lr_finder.mode == 'fast_ai':
-            return out_data
         return tuple(out_data)
 
 def resnet101D(pretrained=False, **kwargs):
