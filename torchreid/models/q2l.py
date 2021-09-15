@@ -41,7 +41,7 @@ class BackboneWrapper(nn.Module):
         super().__init__()
         self.backbone = backbone
         self.position_embedding = position_embedding
-        self.num_channels = backbone.num_features
+        self.num_channels = backbone.get_num_features()
         # self.args = args
 
     def forward(self, input):
@@ -71,7 +71,7 @@ class Qeruy2Label(ModelInterface):
         assert self.is_classification(), "Q2L model is adapted for multilabel setup only"
 
         hidden_dim = transfomer.get_hidden_dim()
-        backbone_features = backbone.get_num_features()
+        backbone_features = backbone.num_channels
         self.input_proj = nn.Conv2d(backbone_features, hidden_dim, kernel_size=1)
         self.query_embed = nn.Embedding(num_classes, hidden_dim)
         self.fc = GroupWiseLinear(num_classes, hidden_dim, use_bias=True)
