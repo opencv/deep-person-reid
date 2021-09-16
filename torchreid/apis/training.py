@@ -66,7 +66,6 @@ def run_lr_finder(cfg, datamanager, model, optimizer, scheduler, classes,
 
 
 def run_training(cfg, datamanager, model, optimizer, scheduler, extra_device_ids, init_lr,
-                 test_before_train=True,
                  tb_writer=None, perf_monitor=None, stop_callback=None,
                  aux_config_opts=None,
                  nncf_changes_in_aux_train_config=None,
@@ -99,10 +98,15 @@ def run_training(cfg, datamanager, model, optimizer, scheduler, extra_device_ids
                           compression_ctrl=compression_ctrl,
                           initial_lr=init_lr)
 
-    if test_before_train:
-        print('Test before training')
-        engine.test(engine_test_kwargs(cfg))
+    accuracy = None
+    if cfg.test.test_before_train or cfg.test.evaluate:
+        if cfg.test.test_before_train:
+            print('Test before training')
+        accuracy = engine.test(0, engine_test_kwargs(cfg), test_only=True)[0]
         if cfg.test.evaluate:
             return
-    engine.run(**engine_run_kwargs(cfg), tb_writer=tb_writer,
-               perf_monitor=perf_monitor, stop_callback=stop_callback)
+
+    final_accuracy = engine.run(**engine_run_kwargs(cfg), tb_writer=tb_writer,
+                                perf_monitor=perf_monitor, stop_callback=stop_callback)
+
+    return accuracy, final_accuracy
