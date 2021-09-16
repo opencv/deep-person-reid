@@ -6,9 +6,6 @@ from .transformer import build_position_encoding
 from .common import ModelInterface
 
 class GroupWiseLinear(nn.Module):
-    # could be changed to:
-    # output = torch.einsum('ijk,zjk->ij', x, self.W)
-    # or output = torch.einsum('ijk,jk->ij', x, self.W[0])
     def __init__(self, num_class, hidden_dim, use_bias=True):
         super().__init__()
         self.num_class = num_class
@@ -42,7 +39,6 @@ class BackboneWrapper(nn.Module):
         self.backbone = backbone
         self.position_embedding = position_embedding
         self.num_channels = backbone.get_num_features()
-        # self.args = args
 
     def forward(self, input):
         out = self.backbone(input, return_featuremaps=True)
@@ -80,7 +76,6 @@ class Qeruy2Label(ModelInterface):
     def forward(self, input):
         src, pos = self.backbone(input)
         src, pos = src[-1], pos[-1]
-        # import ipdb; ipdb.set_trace()
 
         query_input = self.query_embed.weight
         hs = self.transformer(self.input_proj(src), query_input, pos)[0] # B,K,d

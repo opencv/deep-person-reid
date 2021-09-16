@@ -111,8 +111,6 @@ class Transformer(nn.Module):
         if self.rm_self_attn_dec or self.rm_first_self_attn:
             self.rm_self_attn_dec_func()
 
-        # self.debug_mode = False
-        # self.set_debug_mode(self.debug_mode)
 
     def rm_self_attn_dec_func(self):
         total_modifie_layer_num = 0
