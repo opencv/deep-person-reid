@@ -611,7 +611,6 @@ def engine_run_kwargs(cfg):
         'open_layers': cfg.train.open_layers,
         'start_eval': cfg.test.start_eval,
         'eval_freq': cfg.test.eval_freq,
-        'test_only': cfg.test.evaluate,
         'print_freq': cfg.train.print_freq,
         'dist_metric': cfg.test.dist_metric,
         'normalize_feature': cfg.test.normalize_feature,
@@ -619,7 +618,6 @@ def engine_run_kwargs(cfg):
         'visrank_topk': cfg.test.visrank_topk,
         'use_metric_cuhk03': cfg.cuhk03.use_metric_cuhk03,
         'ranks': cfg.test.ranks,
-        'rerank': cfg.test.rerank,
         'initial_seed': cfg.train.seed
     }
 

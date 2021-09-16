@@ -102,5 +102,7 @@ def run_training(cfg, datamanager, model, optimizer, scheduler, extra_device_ids
     if test_before_train:
         print('Test before training')
         engine.test(engine_test_kwargs(cfg))
+        if cfg.test.evaluate:
+            return
     engine.run(**engine_run_kwargs(cfg), tb_writer=tb_writer,
                perf_monitor=perf_monitor, stop_callback=stop_callback)

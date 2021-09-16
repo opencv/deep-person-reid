@@ -273,14 +273,12 @@ class Engine:
         open_layers=None,
         start_eval=0,
         eval_freq=-1,
-        test_only=False,
         dist_metric='euclidean',
         normalize_feature=False,
         visrank=False,
         visrank_topk=10,
         use_metric_cuhk03=False,
         ranks=(1, 5, 10, 20),
-        rerank=False,
         lr_finder=None,
         perf_monitor=None,
         stop_callback=None,
@@ -301,8 +299,6 @@ class Engine:
             start_eval (int, optional): from which epoch to start evaluation. Default is 0.
             eval_freq (int, optional): evaluation frequency. Default is -1 (meaning evaluation
                 is only performed at the end of training).
-            test_only (bool, optional): if True, only runs evaluation on test datasets.
-                Default is False.
             dist_metric (str, optional): distance metric used to compute distance matrix
                 between query and gallery. Default is "euclidean".
             normalize_feature (bool, optional): performs L2 normalization on feature vectors before
@@ -317,24 +313,8 @@ class Engine:
             rerank (bool, optional): uses person re-ranking (by Zhong et al. CVPR'17).
                 Default is False. This is only enabled when test_only=True.
         """
-        if visrank and not test_only:
-            raise ValueError('visrank can be set to True only if test_only=True')
 
-        if test_only:
-            test_results = self.test(
-                                     0,
-                                     dist_metric=dist_metric,
-                                     normalize_feature=normalize_feature,
-                                     visrank=visrank,
-                                     visrank_topk=visrank_topk,
-                                     save_dir=save_dir,
-                                     use_metric_cuhk03=use_metric_cuhk03,
-                                     ranks=ranks,
-                                     rerank=rerank,
-                                     test_only = True
-                                    )
-            return test_results
-        elif lr_finder:
+        if lr_finder:
             self.configure_lr_finder(trial, lr_finder)
             self.backup_model()
 
