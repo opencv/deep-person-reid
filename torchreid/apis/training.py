@@ -59,8 +59,8 @@ def run_lr_finder(cfg, datamanager, model, optimizer, scheduler, classes,
         model, _ = put_main_model_on_the_device(model, cfg.use_gpu, gpu_num, num_aux_models, split_models)
     optimizer = torchreid.optim.build_optimizer(model, **optimizer_kwargs(cfg))
     scheduler = torchreid.optim.build_lr_scheduler(optimizer=optimizer,
-                                                    num_iter=datamanager.num_iter,
-                                                    **lr_scheduler_kwargs(cfg))
+                                                   num_iter=datamanager.num_iter,
+                                                   **lr_scheduler_kwargs(cfg))
 
     return cfg.train.lr
 
