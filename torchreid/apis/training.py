@@ -104,7 +104,7 @@ def run_training(cfg, datamanager, model, optimizer, scheduler, extra_device_ids
             print('Test before training')
         accuracy = engine.test(0, engine_test_kwargs(cfg), test_only=True)[0]
         if cfg.test.evaluate:
-            return
+            return accuracy, None
 
     final_accuracy = engine.run(**engine_run_kwargs(cfg), tb_writer=tb_writer,
                                 perf_monitor=perf_monitor, stop_callback=stop_callback)
