@@ -28,7 +28,7 @@ def score_extraction(data_loader, model, use_gpu, labelmap=[], head_id=0):
     return out_scores, gt_labels
 
 
-def score_extraction_from_ir(data_loader, model, use_gpu, labelmap=[]):
+def score_extraction_from_ir(data_loader, model, labelmap=[]):
     out_scores, gt_labels = [], []
     for data in data_loader.dataset:
         image, label = np.asarray(data[0]), data[1]
@@ -222,10 +222,10 @@ def evaluate_multilabel_classification(dataloader, model, use_gpu):
         return ap.mean(), mean_p_c, mean_r_c, mean_f_c, p_o, r_o, f_o
 
 
-    if isinstance(model, torch.nn.Module):
-        scores, labels = score_extraction(dataloader, model, use_gpu)
-    else:
+    if get_model_attr(model, 'is_ie_model'):
         scores, labels = score_extraction_from_ir(dataloader, model)
+    else:
+        scores, labels = score_extraction(dataloader, model, use_gpu)
 
     scores = 1. / (1 + np.exp(-scores))
     mAP_score = mAP(labels, scores)

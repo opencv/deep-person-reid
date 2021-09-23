@@ -73,6 +73,7 @@ def main():
         from torchreid.utils.ie_tools import VectorCNN
         from openvino.inference_engine import IECore
         cfg.test.batch_size = 1
+        cfg.train.ema.enable = False
         model = VectorCNN(IECore(), cfg.model.load_weights, 'CPU', switch_rb=True, **model_kwargs(cfg, num_classes))
         for _, dataloader in datamanager.test_loader.items():
             dataloader['query'].dataset.transform.transforms = \
