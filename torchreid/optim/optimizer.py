@@ -4,6 +4,10 @@ import torch.nn as nn
 
 import warnings
 
+from nncf.torch.quantization.layers import SymmetricQuantizer
+from nncf.torch.quantization.layers import AsymmetricQuantizer
+from nncf.torch.sparsity.rb.layers import RBSparsifyingWeight
+from nncf.torch.sparsity.layers import BinaryMask
 from .sam import SAM
 from .radam import RAdam
 
@@ -131,22 +135,53 @@ def _build_optim(model,
     # because optimizer builded once and lr in biases isn't changed
     elif nbd and not lr_finder:
         decay, bias_no_decay, weight_no_decay = [], [], []
-        for name, param in model.named_parameters():
-            if not param.requires_grad:
-                continue  # frozen weights
-            if name.endswith("bias"):
-                bias_no_decay.append(param)
-            elif len(param.shape) == 1:
-                weight_no_decay.append(param)
-            elif (name.endswith("weight") and ("norm" in name or "query_embed" in name)):
-                weight_no_decay.append(param)
-            else:
-                decay.append(param)
+        compression_params = []
+        fq_not_trainable_params_count = 0
+        binary_masks_count = 0
+        not_req_grad_params_count = 0
+        for m in model.modules():
+            if isinstance(m, nn.Conv2d) or isinstance(m, nn.Linear):
+                decay.append(m.weight)
+                if m.bias is not None:
+                    bias_no_decay.append(m.bias)
+            elif isinstance(m, SymmetricQuantizer):
+                compression_params.append(m.scale)
+                fq_not_trainable_params_count += 2
+            elif isinstance(m, AsymmetricQuantizer):
+                compression_params.append(m.input_low)
+                compression_params.append(m.input_range)
+                fq_not_trainable_params_count += 1
+            elif isinstance(m, RBSparsifyingWeight):
+                compression_params.append(m.mask)
+            elif isinstance(m, BinaryMask):
+                # Skip non trainable params
+                binary_masks_count += 1
+                continue
+            elif hasattr(m, 'weight') or hasattr(m, 'bias'):
+                if hasattr(m, 'weight'):
+                    weight_no_decay.append(m.weight)
+                if hasattr(m, 'bias'):
+                    bias_no_decay.append(m.bias)
+            elif len(list(m.children())) == 0:
+                for name, param in m.named_parameters():
+                    if len(param.shape) == 1:
+                        weight_no_decay.append(param)
+                    elif (name.endswith("weight") and ("norm" in name or "query_embed" in name)):
+                        weight_no_decay.append(param)
+                    elif param.required_grad:
+                        decay.append(param)
+                    else:
+                        not_req_grad_params_count += 1
 
-        assert len(list(model.parameters())) == len(decay) + len(bias_no_decay) + len(weight_no_decay)
+        assert len(list(model.parameters())) == len(decay) + len(bias_no_decay) + len(weight_no_decay) \
+            + len(compression_params) + fq_not_trainable_params_count + binary_masks_count \
+            + not_req_grad_params_count
+
         param_groups = [{'params': decay, 'lr': lr, 'weight_decay': weight_decay},
                         {'params': bias_no_decay, 'lr': 2 * lr, 'weight_decay': 0.0},
                         {'params': weight_no_decay, 'lr': lr, 'weight_decay': 0.0}]
+        if compression_params:
+            param_groups.append({'params': compression_params, 'lr': lr, 'weight_decay': 0.0})
 
     else:
         param_groups = [{'params': model.parameters(), 'lr': lr, 'weight_decay': weight_decay}]
