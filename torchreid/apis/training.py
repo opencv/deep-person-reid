@@ -31,9 +31,7 @@ from scripts.script_utils import (build_datamanager, build_auxiliary_model,
 
 def run_lr_finder(cfg, datamanager, model, optimizer, scheduler, classes,
                   rebuild_model=True, gpu_num=1, split_models=False):
-    if rebuild_model:
-        backup_model = model
-    else:
+    if not rebuild_model:
         backup_model = deepcopy(model)
 
     engine = build_engine(cfg, datamanager, model, optimizer, scheduler, initial_lr=cfg.train.lr)
@@ -56,18 +54,16 @@ def run_lr_finder(cfg, datamanager, model, optimizer, scheduler, classes,
     num_train_classes = datamanager.num_train_pids
 
     if rebuild_model:
-        model = torchreid.models.build_model(**model_kwargs(cfg, num_train_classes))
+        backup_model = torchreid.models.build_model(**model_kwargs(cfg, num_train_classes))
         num_aux_models = len(cfg.mutual_learning.aux_configs)
-        model, _ = put_main_model_on_the_device(model, cfg.use_gpu, gpu_num, num_aux_models, split_models)
-    else:
-        model = backup_model
+        backup_model, _ = put_main_model_on_the_device(backup_model, cfg.use_gpu, gpu_num, num_aux_models, split_models)
 
-    optimizer = torchreid.optim.build_optimizer(model, **optimizer_kwargs(cfg))
+    optimizer = torchreid.optim.build_optimizer(backup_model, **optimizer_kwargs(cfg))
     scheduler = torchreid.optim.build_lr_scheduler(optimizer=optimizer,
                                                    num_iter=datamanager.num_iter,
                                                    **lr_scheduler_kwargs(cfg))
 
-    return cfg.train.lr, model, optimizer, scheduler
+    return cfg.train.lr, backup_model, optimizer, scheduler
 
 
 def run_training(cfg, datamanager, model, optimizer, scheduler, extra_device_ids, init_lr,
