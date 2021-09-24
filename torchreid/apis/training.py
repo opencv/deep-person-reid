@@ -32,11 +32,11 @@ from scripts.script_utils import (build_datamanager, build_auxiliary_model,
 def run_lr_finder(cfg, datamanager, model, optimizer, scheduler, classes,
                   rebuild_model=True, gpu_num=1, split_models=False):
     if rebuild_model:
-        tmp_model = model
+        backup_model = model
     else:
-        tmp_model = deepcopy(model)
+        backup_model = deepcopy(model)
 
-    engine = build_engine(cfg, datamanager, tmp_model, optimizer, scheduler, initial_lr=cfg.train.lr)
+    engine = build_engine(cfg, datamanager, model, optimizer, scheduler, initial_lr=cfg.train.lr)
     lr_finder = LrFinder(engine=engine, **lr_finder_run_kwargs(cfg))
     aux_lr = lr_finder.process()
 
@@ -54,16 +54,20 @@ def run_lr_finder(cfg, datamanager, model, optimizer, scheduler, classes,
     set_random_seed(cfg.train.seed, cfg.train.deterministic)
     datamanager = build_datamanager(cfg, classes)
     num_train_classes = datamanager.num_train_pids
+
     if rebuild_model:
         model = torchreid.models.build_model(**model_kwargs(cfg, num_train_classes))
         num_aux_models = len(cfg.mutual_learning.aux_configs)
         model, _ = put_main_model_on_the_device(model, cfg.use_gpu, gpu_num, num_aux_models, split_models)
+    else:
+        model = backup_model
+
     optimizer = torchreid.optim.build_optimizer(model, **optimizer_kwargs(cfg))
     scheduler = torchreid.optim.build_lr_scheduler(optimizer=optimizer,
                                                    num_iter=datamanager.num_iter,
                                                    **lr_scheduler_kwargs(cfg))
 
-    return cfg.train.lr
+    return cfg.train.lr, model, optimizer, scheduler
 
 
 def run_training(cfg, datamanager, model, optimizer, scheduler, extra_device_ids, init_lr,

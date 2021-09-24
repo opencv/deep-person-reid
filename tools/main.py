@@ -118,8 +118,8 @@ def main():
     model, extra_device_ids = put_main_model_on_the_device(model, cfg.use_gpu, args.gpu_num, num_aux_models, args.split_models)
 
     if cfg.lr_finder.enable and not cfg.test.evaluate and not cfg.model.resume:
-        aux_lr = run_lr_finder(cfg, datamanager, model, optimizer, scheduler, args.classes,
-                               rebuild_model=True, gpu_num=args.gpu_num, split_models=args.split_models)
+        aux_lr, model, optimizer, scheduler = run_lr_finder(cfg, datamanager, model, optimizer, scheduler, args.classes,
+                                                            rebuild_model=True, gpu_num=args.gpu_num, split_models=args.split_models)
 
 
     log_dir = cfg.data.tb_log_dir if cfg.data.tb_log_dir else cfg.data.save_dir
