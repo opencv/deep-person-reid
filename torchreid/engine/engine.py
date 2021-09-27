@@ -54,7 +54,7 @@ class Engine:
                  optimizers,
                  schedulers,
                  use_gpu=True,
-                 save_chkpt=True,
+                 save_all_chkpts=True,
                  train_patience = 10,
                  lr_decay_factor = 1000,
                  lr_finder = None,
@@ -74,7 +74,7 @@ class Engine:
         self.train_loader = self.datamanager.train_loader
         self.test_loader = self.datamanager.test_loader
         self.use_gpu = (torch.cuda.is_available() and use_gpu)
-        self.save_chkpt = save_chkpt
+        self.save_all_chkpts = save_all_chkpts
         self.writer = None
         self.use_ema_decay = use_ema_decay
         self.start_epoch = 0
@@ -393,9 +393,13 @@ class Engine:
                 should_exit, is_candidate_for_best = self.exit_on_plateau_and_choose_best(top1, smooth_top1)
                 should_exit = self.early_stoping and should_exit
 
-                if self.save_chkpt:
+                if self.save_all_chkpts:
                     self.save_model(self.epoch, save_dir, is_best=is_candidate_for_best,
                                     should_save_ema_model=should_save_ema_model)
+                elif is_candidate_for_best:
+                    self.save_model(0, save_dir, is_best=is_candidate_for_best,
+                                    should_save_ema_model=should_save_ema_model)
+
                 if should_exit:
                     if self.compression_ctrl is None or \
                             (self.compression_ctrl is not None and

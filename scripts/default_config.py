@@ -33,7 +33,7 @@ def get_default_config():
     cfg.model.pretrained = False
     cfg.model.download_weights = True
     cfg.model.load_weights = '' # path to snapshot to load weights
-    cfg.model.save_chkpt = True
+    cfg.model.save_all_chkpts = True
     cfg.model.resume = '' # path to checkpoint for resume training
     cfg.model.dropout_backbone = CN()
     cfg.model.dropout_backbone.p = 0.0
