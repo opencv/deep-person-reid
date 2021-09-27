@@ -6,6 +6,7 @@ from .transformer import build_position_encoding
 from .common import ModelInterface
 
 __all__ = ['build_q2l']
+
 class GroupWiseLinear(nn.Module):
     def __init__(self, num_class, hidden_dim, use_bias=True):
         super().__init__()

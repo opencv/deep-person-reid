@@ -12,7 +12,7 @@ Copy-paste from torch.nn.Transformer with modifications:
     * using modified multihead attention from nn_multiheadattention.py
 """
 import copy
-from typing import Optional, Tuple
+from typing import Optional
 
 import torch
 import torch.nn.functional as F
@@ -269,7 +269,7 @@ class TransformerEncoderLayer(nn.Module):
                      src_key_padding_mask: Optional[Tensor] = None,
                      pos: Optional[Tensor] = None):
         q = k = self.with_pos_embed(src, pos)
-        src2, corr = self.self_attn(q, k, value=src, attn_mask=src_mask,
+        src2, corr = self.self_attn(q, k, src, attn_mask=src_mask,
                               key_padding_mask=src_key_padding_mask)
 
 
@@ -286,7 +286,7 @@ class TransformerEncoderLayer(nn.Module):
                     pos: Optional[Tensor] = None):
         src2 = self.norm1(src)
         q = k = self.with_pos_embed(src2, pos)
-        src2 = self.self_attn(q, k, value=src2, attn_mask=src_mask,
+        src2 = self.self_attn(q, k, src2, attn_mask=src_mask,
                               key_padding_mask=src_key_padding_mask)[0]
 
         src = src + self.dropout1(src2)
@@ -343,15 +343,15 @@ class TransformerDecoderLayer(nn.Module):
         q = k = self.with_pos_embed(tgt, query_pos)
 
         if not self.omit_selfattn:
-            tgt2, sim_mat_1 = self.self_attn(q, k, value=tgt, attn_mask=tgt_mask,
+            tgt2, sim_mat_1 = self.self_attn(q, k, tgt, attn_mask=tgt_mask,
                                 key_padding_mask=tgt_key_padding_mask)
 
             tgt = tgt + self.dropout1(tgt2)
             tgt = self.norm1(tgt)
 
-        tgt2, sim_mat_2 = self.multihead_attn(query=self.with_pos_embed(tgt, query_pos),
-                                key=self.with_pos_embed(memory, pos),
-                                value=memory, attn_mask=memory_mask,
+        tgt2, sim_mat_2 = self.multihead_attn(self.with_pos_embed(tgt, query_pos),
+                                self.with_pos_embed(memory, pos),
+                                memory, attn_mask=memory_mask,
                                 key_padding_mask=memory_key_padding_mask)
 
         tgt = tgt + self.dropout2(tgt2)
@@ -376,9 +376,9 @@ class TransformerDecoderLayer(nn.Module):
 
         tgt = tgt + self.dropout1(tgt2)
         tgt2 = self.norm2(tgt)
-        tgt2 = self.multihead_attn(query=self.with_pos_embed(tgt2, query_pos),
-                                   key=self.with_pos_embed(memory, pos),
-                                   value=memory, attn_mask=memory_mask,
+        tgt2 = self.multihead_attn(self.with_pos_embed(tgt2, query_pos),
+                                   self.with_pos_embed(memory, pos),
+                                   memory, attn_mask=memory_mask,
                                    key_padding_mask=memory_key_padding_mask)[0]
 
         tgt = tgt + self.dropout2(tgt2)
