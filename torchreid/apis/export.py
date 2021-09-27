@@ -21,7 +21,7 @@ import torch
 
 from torch.onnx.symbolic_registry import register_op
 
-from scripts.script_utils import group_norm_symbolic
+from scripts.script_utils import group_norm_symbolic, hardsigmoid
 from torchreid.utils import random_image
 from torchreid.data.transforms import build_inference_transform
 
@@ -50,6 +50,8 @@ def export_onnx(model, cfg, output_file_path='model', disable_dyn_axes=True,
         output_file_path += '.onnx'
 
     register_op("group_norm", group_norm_symbolic, "", opset)
+    register_op("hardsigmoid", hardsigmoid, "", opset)
+
     with torch.no_grad():
         torch.onnx.export(
             model,

@@ -66,7 +66,7 @@ def reset_config(cfg):
 
 def main():
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    parser.add_argument('--config-file', type=str, default='',
+    parser.add_argument('--config-file', type=str, default='', required=True,
                         help='Path to config file')
     parser.add_argument('--output-name', type=str, default='model',
                         help='Path to save ONNX model')
