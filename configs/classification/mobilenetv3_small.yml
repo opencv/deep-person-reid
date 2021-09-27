@@ -15,7 +15,7 @@ model:
   name: 'mobilenetv3_small'
   type: 'classification'
   pretrained: True
-  save_chkpt: True
+  save_all_chkpts: True
   feature_dim: 1024
 
 mutual_learning:

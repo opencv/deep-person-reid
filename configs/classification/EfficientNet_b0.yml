@@ -15,7 +15,7 @@ model:
   name: 'efficientnet_b0'
   type: 'classification'
   pretrained: True
-  save_chkpt: True
+  save_all_chkpts: True
   feature_dim: 1280
 
 custom_datasets:
