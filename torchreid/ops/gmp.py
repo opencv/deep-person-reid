@@ -24,7 +24,7 @@ from torch.nn import functional as F
 
 class GeneralizedMeanPooling(nn.Module):
     def __init__(self, norm=3, output_size=1, eps=1e-6):
-        super(GeneralizedMeanPooling, self).__init__()
+        super().__init__()
         assert norm > 0
         self.p = nn.Parameter(torch.ones(1) * norm)
         self.output_size = output_size

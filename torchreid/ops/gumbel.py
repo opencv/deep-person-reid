@@ -15,7 +15,7 @@
 """
 
 import torch
-import torch.nn as nn
+from torch import nn
 import torch.nn.functional as F
 
 
@@ -38,8 +38,8 @@ class HardGumbelSigmoid(torch.autograd.Function):
 
         if forward_hard_map:
             return (values > 0.).float()
-        else:
-            return soft_map
+
+        return soft_map
 
     @staticmethod
     def backward(ctx, grad_output):
@@ -56,7 +56,7 @@ gumbel_sigmoid = HardGumbelSigmoid.apply
 
 class GumbelSoftmax(nn.Module):
     def __init__(self, scale=1.0, dim=1):
-        super(GumbelSoftmax, self).__init__()
+        super().__init__()
 
         self.scale = float(scale)
         self.dim = dim
@@ -69,7 +69,7 @@ class GumbelSoftmax(nn.Module):
 
 class GumbelSigmoid(nn.Module):
     def __init__(self, scale=1.0):
-        super(GumbelSigmoid, self).__init__()
+        super().__init__()
 
         self.scale = float(scale)
 

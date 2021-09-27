@@ -1,9 +1,9 @@
-import torch.nn as nn
+from torch import nn
 
 
 class HSigmoid(nn.Module):
     def __init__(self, inplace=True):
-        super(HSigmoid, self).__init__()
+        super().__init__()
         self.relu = nn.ReLU6(inplace=inplace)
 
     def forward(self, x):
@@ -12,7 +12,7 @@ class HSigmoid(nn.Module):
 
 class HSwish(nn.Module):
     def __init__(self, inplace=True):
-        super(HSwish, self).__init__()
+        super().__init__()
         self.sigmoid = HSigmoid(inplace=inplace)
 
     def forward(self, x):

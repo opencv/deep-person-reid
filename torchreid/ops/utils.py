@@ -20,7 +20,7 @@ class EvalModeSetter:
         if not isinstance(self.modules, (tuple, list)):
             self.modules = [self.modules]
 
-        self.modes_storage = [dict() for _ in range(len(self.modules))]
+        self.modes_storage = [{} for _ in range(len(self.modules))]
 
         self.m_types = m_type
         if not isinstance(self.m_types, (tuple, list)):

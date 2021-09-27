@@ -16,13 +16,13 @@ Copyright (c) 2021 Intel Corporation
 
 import numpy as np
 import torch
-import torch.nn as nn
+from torch import nn
 from torch.autograd import grad
 
 
 class RSC(nn.Module):
     def __init__(self, retain_p):
-        super(RSC, self).__init__()
+        super().__init__()
 
         self.retain_p = float(retain_p)
         assert 0. < self.retain_p < 1.

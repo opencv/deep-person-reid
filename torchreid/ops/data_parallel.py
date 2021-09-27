@@ -1,18 +1,18 @@
 from itertools import chain
 
 import torch
-import torch.nn as nn
+from torch import nn
 
 
 def map_device(outputs, output_device):
     if isinstance(outputs, torch.Tensor):
         return outputs.to(output_device)
-    elif isinstance(outputs, (tuple, list)):
+    if isinstance(outputs, (tuple, list)):
         return [map_device(o, output_device) for o in outputs]
-    elif isinstance(outputs, dict):
+    if isinstance(outputs, dict):
         return {k: map_device(v, output_device) for k, v in outputs.items()}
-    else:
-        raise ValueError('Unknown output type: {}'.format(type(outputs)))
+
+    raise ValueError(f'Unknown output type: {type(outputs)}')
 
 
 class DataParallel(nn.DataParallel):
@@ -23,8 +23,8 @@ class DataParallel(nn.DataParallel):
         for t in chain(self.module.parameters(), self.module.buffers()):
             if t.device != self.src_device_obj:
                 raise RuntimeError("module must have its parameters and buffers "
-                                   "on device {} (device_ids[0]) but found one of "
-                                   "them on device: {}".format(self.src_device_obj, t.device))
+                                   f"on device {self.src_device_obj} (device_ids[0]) but found one of "
+                                   f"them on device: {t.device}")
 
         inputs, kwargs = self.scatter(inputs, kwargs, self.device_ids)
 

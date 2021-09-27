@@ -1,11 +1,11 @@
 import torch
-import torch.nn as nn
+from torch import nn
 import torch.nn.functional as F
 
 
 class NonLocalModule(nn.Module):
     def __init__(self, in_channels, embed_dim=None, embed_factor=4, spatial_sub_sample=False):
-        super(NonLocalModule, self).__init__()
+        super().__init__()
 
         assert embed_factor >= 1
         self.embed_dim = embed_dim if embed_dim is not None else in_channels // embed_factor

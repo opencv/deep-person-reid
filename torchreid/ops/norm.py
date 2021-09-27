@@ -16,13 +16,13 @@
 
 import numpy as np
 import torch
-import torch.nn as nn
+from torch import nn
 import torch.nn.functional as F
 
 
 class LocalContrastNormalization(nn.Module):
     def __init__(self, num_channels, kernel_size=5, affine=False, eps=1e-4):
-        super(LocalContrastNormalization, self).__init__()
+        super().__init__()
 
         self.num_channels = num_channels
         self.kernel_size = kernel_size

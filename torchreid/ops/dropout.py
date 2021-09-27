@@ -15,7 +15,7 @@
 """
 
 import torch
-import torch.nn as nn
+from torch import nn
 import torch.nn.functional as F
 
 
@@ -23,7 +23,7 @@ class Dropout(nn.Module):
     DISTRIBUTIONS = ['none', 'bernoulli', 'gaussian', 'infodrop']
 
     def __init__(self, p=0.1, mu=0.1, sigma=0.03, dist='bernoulli', kernel=3, temperature=0.2):
-        super(Dropout, self).__init__()
+        super().__init__()
 
         self.dist = dist
         assert self.dist in Dropout.DISTRIBUTIONS

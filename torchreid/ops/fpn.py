@@ -46,9 +46,8 @@ class FeatureExtractor(nn.Module):
 # FIXME. Move it to a proper place.
 def duplicate(x, n, copy=False):
     if copy:
-        return list([x for _ in range(n)])
-    else:
-        return [x, ] * n
+        return [x for _ in range(n)]
+    return [x, ] * n
 
 
 class TopDownLateral(nn.Module):
@@ -104,7 +103,6 @@ class FPN(FeatureExtractor):
 
         if not isinstance(dims_in, (tuple, list)):
             dims_in = (dims_in, )
-        n = len(dims_in)
         if not isinstance(dims_internal, (tuple, list)):
             dims_internal = duplicate(dims_internal, len(dims_in))
             self.dims_internal = dims_internal
@@ -119,7 +117,8 @@ class FPN(FeatureExtractor):
         self.posthoc = nn.ModuleList()
         # Add top-down and lateral connections
         for dim_in, dim_inside in zip(reversed(dims_in[:-1]), reversed(dims_internal[:-1])):
-            self.topdown_lateral.append(topdown_lateral_block(dim_inside, dim_in, dim_inside, group_norm=self.group_norm))
+            self.topdown_lateral.append(topdown_lateral_block(dim_inside, dim_in,
+                                                              dim_inside, group_norm=self.group_norm))
         # Post-hoc scale-specific 3x3 convs
         for dim_inside, dim_out in zip(dims_internal, dims_out):
             self.posthoc.append(nn.Conv2d(dim_inside, dim_out, 3, 1, 1))
