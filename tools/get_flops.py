@@ -6,8 +6,8 @@ from scripts.default_config import (get_default_config, imagedata_kwargs,
                                     model_kwargs, merge_from_files_with_base)
 
 import torchreid
-from torchreid.utils import (collect_env_info, compute_model_complexity,
-                             set_random_seed)
+from torchreid.utils import collect_env_info, set_random_seed
+from ptflops import get_model_complexity_info
 
 
 def build_datamanager(cfg, classification_classes_filter=None):
@@ -27,7 +27,7 @@ def reset_config(cfg, args):
 
 def main():
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    parser.add_argument('--config-file', type=str, default='',
+    parser.add_argument('--config-file', type=str, default='', required=True,
                         help='path to config file')
     parser.add_argument('--custom-roots', type=str, nargs='+',
                         help='types or paths to annotation of custom datasets (delimited by space)')
@@ -63,13 +63,14 @@ def main():
 
     print('Building main model: {}'.format(cfg.model.name))
     model = torchreid.models.build_model(**model_kwargs(cfg, num_train_classes))
-    num_params, flops = compute_model_complexity(model, (1, 3, cfg.data.height, cfg.data.width))
-    print('Main model complexity: params={:,} flops={:,}'.format(num_params, flops * 2))
+    macs, num_params = get_model_complexity_info(model, (3, cfg.data.height, cfg.data.width),
+                                                 as_strings=False, verbose=False, print_per_layer_stat=False)
+    print('Main model complexity: M params={:,} G flops={:,}'.format(num_params / 10**6, macs * 2 / 10**9))
 
     if args.out:
         out = list()
         out.append({'key': 'size', 'display_name': 'Size', 'value': num_params / 10**6, 'unit': 'Mp'})
-        out.append({'key': 'complexity', 'display_name': 'Complexity', 'value': 2 * flops / 10**9,
+        out.append({'key': 'complexity', 'display_name': 'Complexity', 'value': 2 * macs / 10**9,
                     'unit': 'GFLOPs'})
         print('dump to' + args.out)
         with open(args.out, 'w') as write_file:

@@ -5,9 +5,12 @@ import torch
 import torchvision.transforms as T
 from PIL import Image
 
+from ptflops import get_model_complexity_info
+
 from torchreid.models import build_model
-from torchreid.utils import check_isfile, compute_model_complexity, load_pretrained_weights
+from torchreid.utils import check_isfile, load_pretrained_weights
 from scripts.default_config import model_kwargs, get_default_config, merge_from_files_with_base
+
 
 
 class FeatureExtractor(object):
@@ -68,9 +71,8 @@ class FeatureExtractor(object):
         model.eval()
 
         image_size = (cfg.data.height, cfg.data.width)
-        num_params, flops = compute_model_complexity(
-            model, (1, 3, image_size[0], image_size[1])
-        )
+        flops, num_params = get_model_complexity_info(model, (3, image_size[0], image_size[1]),
+                                                      as_strings=False, verbose=False, print_per_layer_stat=False)
 
         if verbose:
             print('Model: {}'.format(cfg.model.name))
