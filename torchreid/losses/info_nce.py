@@ -18,13 +18,13 @@ from __future__ import absolute_import, division
 
 import numpy as np
 import torch
-import torch.nn as nn
+from torch import nn
 import torch.nn.functional as F
 
 
 class InfoNCELoss(nn.Module):
     def __init__(self, use_gpu=True, s=30, end_s=None, duration_s=None, skip_steps_s=None):
-        super(InfoNCELoss, self).__init__()
+        super().__init__()
         self.use_gpu = use_gpu
 
         assert s > 0

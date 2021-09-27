@@ -16,7 +16,7 @@
 
 import numpy as np
 import torch
-import torch.nn as nn
+from  torch import nn
 import torch.nn.functional as F
 
 
@@ -26,7 +26,7 @@ def entropy(p, dim=-1, keepdim=False):
 
 class EntropyLoss(nn.Module):
     def __init__(self, scale=1.0):
-        super(EntropyLoss, self).__init__()
+        super().__init__()
 
         self.scale = scale
         assert self.scale > 0.0
@@ -46,16 +46,10 @@ class EntropyLoss(nn.Module):
 
 
 class MinEntropyLoss(EntropyLoss):
-    def __init__(self, scale=1.0):
-        super(MinEntropyLoss, self).__init__(scale)
-
     def _calc_losses(self, cos_theta, entropy_values):
         return entropy_values
 
 
 class MaxEntropyLoss(EntropyLoss):
-    def __init__(self, scale=1.0):
-        super(MaxEntropyLoss, self).__init__(scale)
-
     def _calc_losses(self, cos_theta, entropy_values):
         return np.log(cos_theta.size(-1)) - entropy_values

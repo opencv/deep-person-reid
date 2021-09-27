@@ -1,7 +1,7 @@
 from __future__ import absolute_import, division
 
 import torch
-import torch.nn as nn
+from torch import nn
 import torch.nn.functional as F
 
 
@@ -30,7 +30,7 @@ class CrossEntropyLoss(nn.Module):
 
     def __init__(self, scale=1.0, epsilon=0.1, use_gpu=True, label_smooth=0,
                  conf_penalty=None, penalty_scale=5.0, augmentations=None):
-        super(CrossEntropyLoss, self).__init__()
+        super().__init__()
 
         self.scale = scale
         self.label_smooth = label_smooth
@@ -87,7 +87,7 @@ class CrossEntropyLoss(nn.Module):
 
 class PseudoCrossEntropyLoss(nn.Module):
     def __init__(self, scale=1.0, epsilon=0.1, use_gpu=True, label_smooth=0, conf_penalty=None):
-        super(PseudoCrossEntropyLoss, self).__init__()
+        super().__init__()
 
         self.scale = scale
         self.label_smooth = label_smooth

@@ -95,7 +95,6 @@ def make_low_freq_image(decay, shape, ch=1):
     if len(shape) == 3:
         mask = mask[:1, :shape[0], :shape[1], :shape[2]]
 
-    mask = mask
     mask = (mask - mask.min())
     mask = mask / mask.max()
     return mask

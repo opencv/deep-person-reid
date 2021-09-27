@@ -15,7 +15,7 @@
 """
 
 import torch
-import torch.nn as nn
+from torch import nn
 import torch.nn.functional as F
 
 
@@ -161,7 +161,7 @@ class CentersPush(nn.Module):
 
 class LocalPushLoss(nn.Module):
     def __init__(self, margin=0.1, smart_margin=True):
-        super(LocalPushLoss, self).__init__()
+        super().__init__()
         self.margin = margin
         assert self.margin >= 0.0
         self.smart_margin = smart_margin
@@ -198,7 +198,7 @@ class MetricLosses:
                  smart_margin=True, triplet='semihard', name='ml'):
         self.name = name
         self.total_losses_num = 0
-        self.losses_map = dict()
+        self.losses_map = {}
 
         self.center_coeff = center_coeff
         if self.center_coeff is not None and self.center_coeff > 0:
@@ -254,30 +254,30 @@ class MetricLosses:
 
     def __call__(self, features, cos_theta, labels, iteration):
         all_loss_values = []
-        loss_summary = dict()
+        loss_summary = {}
 
         center_loss_val = 0
         centers_push_loss_val = 0
         if self.center_coeff > 0.:
             center_loss_val = self.center_loss(features, labels)
             all_loss_values.append(center_loss_val)
-            loss_summary['{}/center'.format(self.name)] = center_loss_val.item()
+            loss_summary[f'{self.name}/center'] = center_loss_val.item()
 
             centers_push_loss_val = self.centers_push_loss(self.center_loss.get_centers(), labels)
             all_loss_values.append(centers_push_loss_val)
-            loss_summary['{}/push_center'.format(self.name)] = centers_push_loss_val.item()
+            loss_summary[f'{self.name}/push_center'] = centers_push_loss_val.item()
 
         triplet_loss_val = 0
         if self.triplet_coeff > 0.0:
             triplet_loss_val = self.triplet_loss(features, labels)
             all_loss_values.append(triplet_loss_val)
-            loss_summary['{}/triplet'.format(self.name)] = triplet_loss_val.item()
+            loss_summary[f'{self.name}/triplet'] = triplet_loss_val.item()
 
         local_push_loss_val = 0
         if self.local_push_coeff > 0.0:
             local_push_loss_val = self.local_push_loss(features, cos_theta, labels)
             all_loss_values.append(local_push_loss_val)
-            loss_summary['{}/local_push'.format(self.name)] = local_push_loss_val.item()
+            loss_summary[f'{self.name}/local_push'] = local_push_loss_val.item()
 
         if self.loss_balancing and self.total_losses_num > 1:
             loss_value = self._balance_losses(all_loss_values)

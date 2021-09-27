@@ -26,7 +26,7 @@ def kl_div(p_logits, q_logits):
 
 
 def symmetric_kl_div(p_logits, q_logits):
-    return kl_div(p_logits, q_logits) + kl_div(q_logits, p_logits)
+    return kl_div(p_logits, q_logits) + kl_div(p_logits=q_logits, q_logits=p_logits)
 
 
 def set_kl_div(logits):

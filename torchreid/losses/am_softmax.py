@@ -14,23 +14,20 @@
  limitations under the License.
 """
 
-from __future__ import division, absolute_import
-import numpy as np
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-from torch.nn import Parameter
-
 import math
 
-from .fmix import FMixBase, sample_mask
+import numpy as np
+import torch
+from torch import nn
+import torch.nn.functional as F
+from torch.nn import Parameter
 
 
 class AngleSimpleLinear(nn.Module):
     """Computes cos of angles between input vectors and weights vectors"""
 
     def __init__(self, in_features, out_features):
-        super(AngleSimpleLinear, self).__init__()
+        super().__init__()
         self.in_features = in_features
         self.out_features = out_features
         self.weight = Parameter(torch.Tensor(in_features, out_features))
@@ -59,7 +56,7 @@ class AMSoftmaxLoss(nn.Module):
                  label_smooth=0, epsilon=0.1, aug_type='', pr_product=False,
                  symmetric_ce=False, class_counts=None, adaptive_margins=False,
                  class_weighting=False):
-        super(AMSoftmaxLoss, self).__init__()
+        super().__init__()
         self.use_gpu = use_gpu
         self.conf_penalty = conf_penalty
         self.label_smooth = label_smooth
@@ -117,7 +114,7 @@ class AMSoftmaxLoss(nn.Module):
         frequencies = counts / np.sum(counts)
         init_weights = np.reciprocal(frequencies + eps)
 
-        average_weights = list()
+        average_weights = []
         for _ in range(num_steps):
             ids = np.random.choice(class_ids, num_samples, p=frequencies)
             values = class_ids[ids]
@@ -243,8 +240,9 @@ class AMSoftmaxLoss(nn.Module):
 
         if self.t > 1:
             h_theta = self.t - 1 + self.t*cos_theta
-            support_vecs_mask = (1 - index) * \
-                torch.lt(torch.masked_select(phi_theta, index).view(-1, 1).repeat(1, h_theta.shape[1]) - cos_theta, 0)
+            support_vecs_mask = (1 - one_hot_target) * \
+                torch.lt(torch.masked_select(phi_theta,
+                                             one_hot_target).view(-1, 1).repeat(1, h_theta.shape[1]) - cos_theta, 0)
             output = torch.where(support_vecs_mask, h_theta, output)
 
             return F.cross_entropy(self.last_scale * output, target)

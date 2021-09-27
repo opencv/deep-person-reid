@@ -15,7 +15,6 @@ if __name__ == '__main__':
         'torchreid/models',
         'torchreid/data',
         'torchreid/engine',
-        'torchreid/losses',
         'torchreid/metrics',
         'torchreid/ops',
         'torchreid/optim',

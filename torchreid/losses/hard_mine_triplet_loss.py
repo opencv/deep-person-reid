@@ -1,23 +1,23 @@
 from __future__ import absolute_import, division
 
 import torch
-import torch.nn as nn
+from torch import nn
 
 
 class TripletLoss(nn.Module):
     """Triplet loss with hard positive/negative mining.
-    
+
     Reference:
         Hermans et al. In Defense of the Triplet Loss for Person Re-Identification. arXiv:1703.07737.
-    
+
     Imported from `<https://github.com/Cysu/open-reid/blob/master/reid/loss/triplet.py>`_.
-    
+
     Args:
         margin (float, optional): margin for triplet. Default is 0.3.
     """
 
     def __init__(self, margin=0.3):
-        super(TripletLoss, self).__init__()
+        super().__init__()
         self.margin = margin
         self.ranking_loss = nn.MarginRankingLoss(margin=margin)
 

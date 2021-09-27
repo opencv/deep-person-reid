@@ -15,7 +15,7 @@
 """
 
 import torch
-import torch.nn as nn
+from torch import nn
 import torch.nn.functional as F
 
 
@@ -228,5 +228,5 @@ def get_regularizer(cfg_reg):
 
     if len(regularizers) > 0:
         return ComposeRegularizer(regularizers)
-    else:
-        return None
+
+    return None
