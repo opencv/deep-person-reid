@@ -6,12 +6,7 @@ import warnings
 
 from .sam import SAM
 from .radam import RAdam
-
-NNCF_ENABLED = True
-try:
-    from nncf.torch.layer_utils import CompressionParameter
-except ImportError:
-    NNCF_ENABLED = False
+from torchreid.integration.nncf.compression import get_compression_parameter
 
 AVAI_OPTIMS = {'adam', 'amsgrad', 'sgd', 'rmsprop', 'radam', 'sam'}
 
@@ -137,12 +132,18 @@ def _build_optim(model,
     # because optimizer builded once and lr in biases isn't changed
     elif nbd and not lr_finder:
         decay, bias_no_decay, weight_no_decay = [], [], []
-        compression_params = []
+        compression_params = set()
+        CompressionParameter = get_compression_parameter()
+        if CompressionParameter:
+            for param in model.parameters():
+                if param.requires_grad and isinstance(param, CompressionParameter):
+                    compression_params.add(param)
+
         for name, param in model.named_parameters():
-            if not param.requires_grad:
+            if param in compression_params:
+                continue  # Param is already registered
+            elif not param.requires_grad:
                 continue  # frozen weights
-            elif NNCF_ENABLED and isinstance(param, CompressionParameter):
-                compression_params.append(param)
             elif name.endswith("bias"):
                 bias_no_decay.append(param)
             elif len(param.shape) == 1:
@@ -156,8 +157,7 @@ def _build_optim(model,
                         {'params': bias_no_decay, 'lr': 2 * lr, 'weight_decay': 0.0},
                         {'params': weight_no_decay, 'lr': lr, 'weight_decay': 0.0}]
         if compression_params:
-            param_groups.append({'params': compression_params, 'lr': lr, 'weight_decay': 0.0})
-
+            param_groups.append({'params': list(compression_params), 'lr': lr, 'weight_decay': 0.0})
     else:
         param_groups = [{'params': model.parameters(), 'lr': lr, 'weight_decay': weight_decay}]
 

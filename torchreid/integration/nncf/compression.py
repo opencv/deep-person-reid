@@ -16,6 +16,13 @@ def nullcontext():
     """
     yield
 
+def get_compression_parameter():
+    try:
+        from nncf.torch.layer_utils import CompressionParameter
+        return CompressionParameter
+    except ImportError:
+        return None
+
 def get_no_nncf_trace_context_manager():
     try:
         from nncf.torch.dynamic_graph.context import \
