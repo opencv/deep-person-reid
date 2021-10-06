@@ -13,6 +13,8 @@ AVAI_MODELS = {
                 'tresnet' : 'tresnet_m',
                 'efficientnetv2_s_21k': 'tf_efficientnetv2_s_in21k',
                 'efficientnetv2_s_1k': 'tf_efficientnetv2_s_in21ft1k',
+                'efficientnetv2_m_21k': 'tf_efficientnetv2_m_in21k',
+                'efficientnetv2_m_1k': 'tf_efficientnetv2_m_in21ft1k',
                 'efficientnetv2_b0' : 'tf_efficientnetv2_b0',
               }
 
