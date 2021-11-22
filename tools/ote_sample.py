@@ -42,11 +42,15 @@ def parse_args():
     parser.add_argument('template_file_path', help='path to template file')
     parser.add_argument('--data-dir', default='data')
     parser.add_argument('--export', action='store_true')
+    parser.add_argument('--debug-dump-path', default='')
     args = parser.parse_args()
     return args
 
 
 def main(args):
+    if args.debug_dump_path:
+        from torchreid.utils import Logger
+        sys.stdout = Logger(args.debug_dump_path)
     logger.info('Initialize dataset')
     dataset = ClassificationDatasetAdapter(
         train_data_root=osp.join(args.data_dir, 'train'),
