@@ -16,6 +16,7 @@ import argparse
 import logging
 import os.path as osp
 import sys
+import time
 
 from ote_sdk.entities.inference_parameters import InferenceParameters
 from ote_sdk.configuration.helper import create
@@ -42,15 +43,16 @@ def parse_args():
     parser.add_argument('template_file_path', help='path to template file')
     parser.add_argument('--data-dir', default='data')
     parser.add_argument('--export', action='store_true')
-    parser.add_argument('--debug-dump-path', default='')
+    parser.add_argument('--debug-dump-folder', default='')
     args = parser.parse_args()
     return args
 
 
 def main(args):
-    if args.debug_dump_path:
+    if args.debug_dump_folder:
         from torchreid.utils import Logger
-        sys.stdout = Logger(args.debug_dump_path)
+        log_name = 'ote_task.log' + time.strftime('-%Y-%m-%d-%H-%M-%S')
+        sys.stdout = Logger(osp.join(args.debug_dump_folder, log_name))
     logger.info('Initialize dataset')
     dataset = ClassificationDatasetAdapter(
         train_data_root=osp.join(args.data_dir, 'train'),
