@@ -20,13 +20,8 @@ import sys
 from ote_sdk.entities.inference_parameters import InferenceParameters
 from ote_sdk.configuration.helper import create
 from ote_sdk.entities.datasets import Subset
-from ote_sdk.entities.model_template import parse_model_template, TargetDevice
-from ote_sdk.entities.model import (
-    ModelEntity,
-    ModelPrecision,
-    ModelStatus,
-    ModelOptimizationType
-)
+from ote_sdk.entities.model_template import parse_model_template
+from ote_sdk.entities.model import ModelEntity, ModelStatus
 from ote_sdk.usecases.tasks.interfaces.export_interface import ExportType
 from ote_sdk.usecases.tasks.interfaces.optimization_interface import OptimizationType
 from ote_sdk.entities.optimization_parameters import OptimizationParameters
@@ -35,8 +30,6 @@ from ote_sdk.entities.task_environment import TaskEnvironment
 
 from torchreid.integration.sc.utils import (ClassificationDatasetAdapter,
                                             generate_label_schema,
-                                            reload_hyper_parameters,
-                                            set_values_as_default,
                                             get_task_class)
 
 
@@ -152,6 +145,7 @@ def main(args):
         logger.info('Performance of optimized model:')
         openvino_task.evaluate(resultset)
         logger.info(str(resultset.performance))
+
 
 if __name__ == '__main__':
     args = parse_args()

@@ -41,7 +41,7 @@ from ote_sdk.configuration import cfg_helper
 from ote_sdk.configuration.helper.utils import ids_to_strings
 from ote_sdk.entities.model import ModelPrecision
 from ote_sdk.usecases.tasks.interfaces.export_interface import ExportType, IExportTask
-from ote_sdk.entities.model import ModelEntity, ModelStatus
+from ote_sdk.entities.model import ModelEntity, ModelStatus, ModelFormat, ModelOptimizationType
 from ote_sdk.entities.metadata import FloatMetadata, FloatType
 from ote_sdk.entities.resultset import ResultSetEntity
 from ote_sdk.entities.scored_label import ScoredLabel
@@ -356,27 +356,35 @@ class OTEClassificationTask(ITrainingTask, IInferenceTask, IEvaluationTask, IExp
     def export(self, export_type: ExportType, output_model: ModelEntity):
         assert export_type == ExportType.OPENVINO
         optimized_model_precision = ModelPrecision.FP32
+        output_model.model_format = ModelFormat.OPENVINO
+        output_model.optimization_type = ModelOptimizationType.MO
 
         with tempfile.TemporaryDirectory() as tempdir:
             optimized_model_dir = os.path.join(tempdir, "dor")
             logger.info(f'Optimized model will be temporarily saved to "{optimized_model_dir}"')
             os.makedirs(optimized_model_dir, exist_ok=True)
+            try:
+                onnx_model_path = os.path.join(optimized_model_dir, 'model.onnx')
+                mix_precision_status = self._model.mix_precision
+                self._model.mix_precision = False
+                export_onnx(self._model.eval(), self._cfg, onnx_model_path)
+                self._model.mix_precision = mix_precision_status
+                export_ir(onnx_model_path, self._cfg.data.norm_mean, self._cfg.data.norm_std,
+                          optimized_model_dir=optimized_model_dir, data_type=optimized_model_precision.name)
 
-            onnx_model_path = os.path.join(optimized_model_dir, 'model.onnx')
-            mix_precision_status = self._model.mix_precision
-            self._model.mix_precision = False
-            export_onnx(self._model.eval(), self._cfg, onnx_model_path)
-            self._model.mix_precision = mix_precision_status
-            export_ir(onnx_model_path, self._cfg.data.norm_mean, self._cfg.data.norm_std,
-                      optimized_model_dir=optimized_model_dir, data_type=optimized_model_precision.name)
-
-            bin_file = [f for f in os.listdir(optimized_model_dir) if f.endswith('.bin')][0]
-            xml_file = [f for f in os.listdir(optimized_model_dir) if f.endswith('.xml')][0]
-            with open(os.path.join(optimized_model_dir, bin_file), "rb") as f:
-                output_model.set_data("openvino.bin", f.read())
-            with open(os.path.join(optimized_model_dir, xml_file), "rb") as f:
-                output_model.set_data("openvino.xml", f.read())
-            output_model.precision = [optimized_model_precision]
+                bin_file = [f for f in os.listdir(optimized_model_dir) if f.endswith('.bin')][0]
+                xml_file = [f for f in os.listdir(optimized_model_dir) if f.endswith('.xml')][0]
+                with open(os.path.join(optimized_model_dir, bin_file), "rb") as f:
+                    output_model.set_data("openvino.bin", f.read())
+                with open(os.path.join(optimized_model_dir, xml_file), "rb") as f:
+                    output_model.set_data("openvino.xml", f.read())
+                output_model.precision = [optimized_model_precision]
+                output_model.optimization_methods = []
+                output_model.model_status = ModelStatus.SUCCESS
+            except Exception as ex:
+                output_model.model_status = ModelStatus.FAILED
+                raise RuntimeError('Optimization was unsuccessful.') from ex
+            logger.info('Exporting completed.')
 
     @staticmethod
     def _is_docker():
