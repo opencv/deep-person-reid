@@ -173,8 +173,8 @@ class OTEClassificationTask(ITrainingTask, IInferenceTask, IEvaluationTask, IExp
         buffer = io.BytesIO()
         hyperparams = self._task_environment.get_hyper_parameters(OTEClassificationParameters)
         hyperparams_str = ids_to_strings(cfg_helper.convert(hyperparams, dict, enum_to_str=True))
-        labels = {label.name: label.color.rgb_tuple for label in self._labels}
-        modelinfo = {'model': self._model.state_dict(), 'config': hyperparams_str, 'labels': labels, 'VERSION': 1}
+        modelinfo = {'model': self._model.state_dict(), 'config': hyperparams_str,
+                     'label_schema': self._task_environment.label_schema, 'VERSION': 1}
         torch.save(modelinfo, buffer)
         output_model.set_data("weights.pth", buffer.getvalue())
 
