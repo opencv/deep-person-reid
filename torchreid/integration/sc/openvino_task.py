@@ -21,7 +21,6 @@ from typing import Any, Dict, Tuple, Optional, Union
 
 import cv2 as cv
 import numpy as np
-import PIL
 
 from ote_sdk.entities.annotation import Annotation, AnnotationSceneEntity, AnnotationSceneKind
 from ote_sdk.entities.datasets import DatasetEntity
@@ -116,8 +115,7 @@ class OpenVINOClassificationInferencer(BaseOpenVINOInferencer):
     @staticmethod
     def resize_image(image: np.ndarray, size: Tuple[int], keep_aspect_ratio: bool = False) -> np.ndarray:
         if not keep_aspect_ratio:
-            img = PIL.Image.fromarray(image).resize(size, resample=PIL.Image.BILINEAR)
-            resized_frame = np.array(img, dtype=np.uint8)
+            resized_frame = cv.resize(image, dsize=size)
         else:
             h, w = image.shape[:2]
             scale = min(size[1] / h, size[0] / w)

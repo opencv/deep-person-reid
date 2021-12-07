@@ -9,8 +9,8 @@ import numpy as np
 import torch
 import re
 from PIL import Image, ImageOps, ImageEnhance, ImageDraw
-from torchvision.transforms import (ColorJitter, Compose, Normalize, Resize,
-                                    ToTensor, InterpolationMode)
+from torchvision.transforms import (ColorJitter, Compose, Normalize,
+                                    ToTensor)
 from torchvision.transforms import RandomCrop as TorchRandomCrop
 from torchvision.transforms import functional as F
 from randaugment import RandAugment
@@ -952,8 +952,14 @@ class RandomCropPad(TorchRandomCrop):
 
         return image, mask
 
+
+def ocv_resize_2_pil(pil_img, size, interp=cv2.INTER_LINEAR):
+    return Image.fromarray(cv2.resize(src=np.array(pil_img, dtype=np.uint8), dsize=size,
+                                      interpolation=interp))
+
+
 class PairResize(object):
-    def __init__(self, size, interpolation=InterpolationMode.BILINEAR):
+    def __init__(self, size, interpolation=cv2.INTER_LINEAR):
         assert isinstance(size, int) or len(size) == 2
         self.size = size
         self.interpolation = interpolation
@@ -961,10 +967,21 @@ class PairResize(object):
     def __call__(self, input_tuple):
         image, mask = input_tuple
 
-        image = F.resize(image, self.size, self.interpolation)
-        mask = F.resize(mask, self.size, self.interpolation) if mask != '' else mask
+        image = ocv_resize_2_pil(image, self.size, self.interpolation)
+        mask = ocv_resize_2_pil(mask, self.size, self.interpolation) if mask != '' else mask
 
         return image, mask
+
+
+class SingleResize(object):
+    def __init__(self, size, interpolation=cv2.INTER_LINEAR):
+        assert isinstance(size, int) or len(size) == 2
+        self.size = size
+        self.interpolation = interpolation
+
+    def __call__(self, image):
+        image = ocv_resize_2_pil(image, self.size, self.interpolation)
+        return image
 
 
 class PairNormalize(object):
@@ -1448,7 +1465,7 @@ def build_inference_transform(height, width, norm_mean=(0.485, 0.456, 0.406),
     print('+ to torch tensor of range [0, 1]')
     print('+ normalization (mean={}, std={})'.format(norm_mean, norm_std))
     transform_te = Compose([
-        Resize((height, width)),
+        SingleResize((height, width)),
         ToTensor(),
         Normalize(mean=norm_mean, std=norm_std),
     ])
