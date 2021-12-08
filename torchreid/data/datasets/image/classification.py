@@ -109,10 +109,8 @@ class ExternalDatasetWrapper(ImageDataset):
         return len(self.data_provider)
 
     def get_input(self, idx: int):
-        sample = self.data_provider[idx]['img']
-
+        img = self.data_provider[idx]['img']
         if self.transform is not None:
-            img = Image.fromarray(sample)
             img, _ = self.transform((img, ''))
         return img
 

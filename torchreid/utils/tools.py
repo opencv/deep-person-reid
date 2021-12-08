@@ -13,6 +13,7 @@ import yaml
 import numpy as np
 import PIL
 import torch
+import cv2 as cv
 from PIL import Image
 
 __all__ = [
@@ -122,21 +123,20 @@ def read_image(path, grayscale=False):
 
     while not got_img:
         try:
-            img = Image.open(path).convert('L' if grayscale else 'RGB')
+            img = cv.cvtColor(cv.imread(path, cv.IMREAD_COLOR), cv.COLOR_BGR2RGB)
             got_img = True
         except IOError:
             print('IOError occurred when reading "{}".'.format(path))
 
     return img
 
+
 def random_image(height, width):
     input_size = (height, width, 3)
     img = np.random.rand(*input_size).astype(np.float32)
     img = np.uint8(img * 255)
 
-    out_img = Image.fromarray(img)
-
-    return out_img
+    return img
 
 
 def collect_env_info():

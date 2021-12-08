@@ -324,11 +324,6 @@ def get_default_config():
     cfg.data.transforms.equalize.enable = False
     cfg.data.transforms.equalize.p = 0.5
 
-    cfg.data.transforms.random_padding = CN()
-    cfg.data.transforms.random_padding.enable = False
-    cfg.data.transforms.random_padding.p = 0.5
-    cfg.data.transforms.random_padding.padding = (0, 10)
-
     cfg.data.transforms.random_perspective = CN()
     cfg.data.transforms.random_perspective.enable = False
     cfg.data.transforms.random_perspective.p = 0.5
@@ -408,7 +403,6 @@ def get_default_config():
     cfg.data.transforms.random_figures.thicknesses = (1, 6)
     cfg.data.transforms.random_figures.circle_radiuses = (5, 64)
     cfg.data.transforms.random_figures.figure_prob = 0.5
-    cfg.data.transforms.random_figures.before_resize = True
     cfg.data.transforms.random_figures.figures = ['line', 'rectangle', 'circle']
 
     cfg.data.transforms.random_patch = CN()
@@ -429,7 +423,6 @@ def get_default_config():
     cfg.data.transforms.random_grid.grid_size = (24, 64)
     cfg.data.transforms.random_grid.thickness = (1, 1)
     cfg.data.transforms.random_grid.angle = (0, 180)
-    cfg.data.transforms.random_grid.before_resize = True
 
     cfg.data.transforms.random_background_substitution = CN()
     cfg.data.transforms.random_background_substitution.enable = False
@@ -691,7 +684,6 @@ def augmentation_kwargs(cfg):
         'random_crop': cfg.data.transforms.random_crop,
         'random_gray_scale': cfg.data.transforms.random_gray_scale,
         'force_gray_scale': cfg.data.transforms.force_gray_scale,
-        'random_padding': cfg.data.transforms.random_padding,
         'random_perspective': cfg.data.transforms.random_perspective,
         'color_jitter': cfg.data.transforms.color_jitter,
         'random_erase': cfg.data.transforms.random_erase,
