@@ -133,7 +133,7 @@ class OTEClassificationTask(ITrainingTask, IInferenceTask, IEvaluationTask, IExp
         """
         num_train_classes = len(self._labels)
         model = torchreid.models.build_model(**model_kwargs(config, num_train_classes))
-        if self._cfg.model.load_weights:
+        if self._cfg.model.load_weights and not from_scratch:
             load_pretrained_weights(model, self._cfg.model.load_weights)
         return model
 
