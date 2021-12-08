@@ -38,13 +38,6 @@ def _get_cur_action_from_epoch_interval(epoch_interval, epoch):
 
     return epoch_interval.value_inside
 
-def get_initial_lr_from_checkpoint(filename):
-    if not filename:
-        return None
-    checkpoint = torch.load(filename, map_location='cpu')
-    if not isinstance(checkpoint, dict):
-        return None
-    return checkpoint.get('initial_lr')
 
 class Engine:
     r"""A generic base Engine class for both image- and video-reid."""
@@ -204,28 +197,39 @@ class Engine:
             else:
                 model_state_dict = self.models[name].state_dict()
 
+            checkpoint = {
+                'state_dict': model_state_dict,
+                'epoch': epoch + 1,
+                'optimizer': self.optims[name].state_dict(),
+                'scheduler': self.scheds[name].state_dict(),
+                'num_classes': self.datamanager.num_train_pids,
+                'classes_map': self.datamanager.train_loader.dataset.classes,
+                'initial_lr': self.initial_lr,
+            }
+
+            if self.compression_ctrl is not None:
+                checkpoint['compression_state'] = self.compression_ctrl.get_compression_state()
+                checkpoint['nncf_metainfo'] = self.nncf_metainfo
+
             ckpt_path = save_checkpoint(
-                            {
-                                'state_dict': model_state_dict,
-                                'epoch': epoch + 1,
-                                'optimizer': self.optims[name].state_dict(),
-                                'scheduler': self.scheds[name].state_dict(),
-                                'num_classes': self.datamanager.num_train_pids,
-                                'classes_map': self.datamanager.train_loader.dataset.classes,
-                                'nncf_metainfo': self.nncf_metainfo,
-                                'initial_lr': self.initial_lr
-                            },
+                            checkpoint,
                             osp.join(save_dir, name),
                             is_best=is_best,
                             name=name
                         )
 
             if name == self.main_model_name:
-                latest_name = osp.join(save_dir, 'latest.pth')
-                create_sym_link(ckpt_path, latest_name)
-                if is_best:
-                    best_model = osp.join(save_dir, 'best.pth')
-                    create_sym_link(ckpt_path, best_model)
+                latest_ckpt_filename = 'latest.pth'
+                best_ckpt_filename = 'best.pth'
+            else:
+                latest_ckpt_filename = f'latest_{name}.pth'
+                best_ckpt_filename = f'best_{name}.pth'
+
+            latest_name = osp.join(save_dir, latest_ckpt_filename)
+            create_sym_link(ckpt_path, latest_name)
+            if is_best:
+                best_model = osp.join(save_dir, best_ckpt_filename)
+                create_sym_link(ckpt_path, best_model)
 
     def set_model_mode(self, mode='train', names=None):
         assert mode in ['train', 'eval', 'test']
@@ -452,7 +456,6 @@ class Engine:
         for param_group in self.optims[self.main_model_name].param_groups:
             param_group["lr"] = round(lr,6)
         print(f"training with next lr: {lr}")
-
 
     def backup_model(self):
         print("backuping model...")

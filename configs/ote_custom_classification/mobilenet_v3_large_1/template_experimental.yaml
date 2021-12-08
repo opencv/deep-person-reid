@@ -13,8 +13,9 @@ framework: OTEClassification v1.2.3
 
 # Task implementations.
 entrypoints:
-  base: torchreid.integration.sc.task.OTEClassificationTask
+  base: torchreid.integration.sc.train_task.OTEClassificationTrainingTask
   openvino: torchreid.integration.sc.openvino_task.OpenVINOClassificationTask
+  nncf: torchreid.integration.sc.nncf_task.OTEClassificationNNCFTask
 
 # Capabilities.
 capabilities:
@@ -32,6 +33,14 @@ hyper_parameters:
         default_value: 200
       learning_rate:
         default_value: 0.016
+    nncf_optimization:
+      enable_quantization:
+        default_value: true
+      enable_pruning:
+        default_value: false
+      maximal_accuracy_degradation:
+        default_value: 0.01
+
 
 # Training resources.
 max_nodes: 1

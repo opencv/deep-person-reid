@@ -443,19 +443,14 @@ def get_default_config():
 
     # NNCF part
     cfg.nncf = CN()
-    # this flag forces using NNCF
-    cfg.nncf.enable = False
     # coefficient to decrease LR for NNCF training
     # (the original initial LR for training will be read from the checkpoint's metainfo)
     cfg.nncf.coeff_decrease_lr_for_nncf = 0.035
     # path to a json file with NNCF config
     cfg.nncf.nncf_config_path = ''
-    # path to a YAML file with changes to be applied to the main train config for NNCF training
-    cfg.nncf.changes_in_main_train_config = ''
-    # path to a YAML file with changes to be applied to the aux train config for NNCF training
-    cfg.nncf.changes_in_aux_train_config = ''
 
     return cfg
+
 
 def merge_from_files_with_base(cfg, cfg_path):
     def _get_list_of_files(cur_path, set_of_files=None):

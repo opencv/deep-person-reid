@@ -24,13 +24,12 @@ from scripts.default_config import get_default_config, model_kwargs, imagedata_k
 from scripts.script_utils import reset_config, build_base_argparser, check_classification_classes
 
 import torchreid
+from torchreid.integration.nncf.compression import get_compression_hyperparams
 from torchreid.ops import DataParallel
-from torchreid.models import build_model
 from torchreid.utils import (Logger, set_random_seed, load_pretrained_weights,)
 from torchreid.engine import build_engine
-from torchreid.integration.nncf.compression import is_checkpoint_nncf
 from torchreid.integration.nncf.compression_script_utils import (make_nncf_changes_in_eval,
-                                                                 make_nncf_changes_in_main_training_config)
+                                                                 make_nncf_changes_in_config)
 
 
 def main():
@@ -45,10 +44,18 @@ def main():
     cfg.merge_from_list(args.opts)
 
     is_ie_model = cfg.model.load_weights.endswith('.xml')
-    is_nncf_used = (not is_ie_model) and is_checkpoint_nncf(cfg.model.load_weights)
-    if is_nncf_used:
-        print(f'Using NNCF -- making NNCF changes in config')
-        cfg = make_nncf_changes_in_main_training_config(cfg, args.opts)
+    if not is_ie_model:
+        compression_hyperparams = get_compression_hyperparams(cfg.model.load_weights)
+        is_nncf_used = compression_hyperparams['enable_quantization'] or compression_hyperparams['enable_pruning']
+
+        if is_nncf_used:
+            print(f'Using NNCF -- making NNCF changes in config')
+            cfg = make_nncf_changes_in_config(cfg,
+                                              compression_hyperparams['enable_quantization'],
+                                              compression_hyperparams['enable_pruning'],
+                                              args.opts)
+    else:
+        is_nncf_used = False
 
     set_random_seed(cfg.train.seed)
 

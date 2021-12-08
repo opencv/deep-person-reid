@@ -23,11 +23,11 @@ import torch
 from scripts.default_config import get_default_config, model_kwargs, merge_from_files_with_base
 from scripts.script_utils import patch_InplaceAbn_forward
 from torchreid.apis.export import export_onnx, export_ir
+from torchreid.integration.nncf.compression import get_compression_hyperparams
 from torchreid.models import build_model
 from torchreid.utils import load_checkpoint, load_pretrained_weights
-from torchreid.integration.nncf.compression import is_checkpoint_nncf
 from torchreid.integration.nncf.compression_script_utils import (make_nncf_changes_in_eval,
-                                                                 make_nncf_changes_in_main_training_config)
+                                                                 make_nncf_changes_in_config)
 
 
 def parse_num_classes(source_datasets, classification=False, num_classes=None, snap_path=None):
@@ -89,10 +89,14 @@ def main():
     reset_config(cfg)
     cfg.merge_from_list(args.opts)
 
-    is_nncf_used = is_checkpoint_nncf(cfg.model.load_weights)
+    compression_hyperparams = get_compression_hyperparams(cfg.model.load_weights)
+    is_nncf_used = compression_hyperparams['enable_quantization'] or compression_hyperparams['enable_pruning']
     if is_nncf_used:
         print(f'Using NNCF -- making NNCF changes in config')
-        cfg = make_nncf_changes_in_main_training_config(cfg, args.opts)
+        cfg = make_nncf_changes_in_config(cfg,
+                                          compression_hyperparams['enable_quantization'],
+                                          compression_hyperparams['enable_pruning'],
+                                          args.opts)
     cfg.train.mix_precision = False
     cfg.freeze()
     num_classes = parse_num_classes(source_datasets=cfg.data.sources,

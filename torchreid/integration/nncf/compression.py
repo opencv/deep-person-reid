@@ -1,13 +1,30 @@
+# Copyright (C) 2021 Intel Corporation
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+
+import importlib
 import os
-from collections import OrderedDict
 from contextlib import contextmanager
 from pprint import pformat
 
+import logging
 import torch
 
-from torchreid.utils.tools import check_isfile, random_image
+from torchreid.utils.tools import random_image
 
-# pylint: disable=line-too-long
+logger = logging.getLogger(__name__)
+_is_nncf_enabled = importlib.util.find_spec('nncf') is not None
+
 
 @contextmanager
 def nullcontext():
@@ -16,12 +33,23 @@ def nullcontext():
     """
     yield
 
+
+def is_nncf_enabled():
+    return _is_nncf_enabled
+
+
+def check_nncf_is_enabled():
+    if not is_nncf_enabled():
+        raise RuntimeError('Tried to use NNCF, but NNCF is not installed')
+
+
 def get_compression_parameter():
     try:
         from nncf.torch.layer_utils import CompressionParameter
         return CompressionParameter
     except ImportError:
         return None
+
 
 def get_no_nncf_trace_context_manager():
     try:
@@ -31,56 +59,80 @@ def get_no_nncf_trace_context_manager():
     except ImportError:
         return nullcontext
 
-def _get_nncf_metainfo_from_checkpoint(filename):
-    if not filename:
-        return None
-    if check_isfile(filename):
-        checkpoint = torch.load(filename, map_location='cpu')
-    else:
-        return None
-    if not isinstance(checkpoint, dict):
-        return None
-    return checkpoint.get('nncf_metainfo', None)
 
-def create_nncf_metainfo(nncf_compression_enabled, nncf_config):
+def safe_load_checkpoint(path, map_location=None):
+    try:
+        from torchreid.utils import load_checkpoint
+        return load_checkpoint(path, map_location=map_location)
+    except FileNotFoundError:
+        return None
+
+
+def _get_nncf_metainfo_from_state(state):
+    if not isinstance(state, dict):
+        return None
+    return state.get('nncf_metainfo', None)
+
+
+def create_nncf_metainfo(enable_quantization, enable_pruning, nncf_config):
     nncf_metainfo = {
-            'nncf_compression_enabled': nncf_compression_enabled,
-            'nncf_config': nncf_config,
-        }
+        'hyperparams': {
+            'enable_quantization': enable_quantization,
+            'enable_pruning': enable_pruning,
+        },
+        'nncf_config': nncf_config,
+    }
     return nncf_metainfo
 
-def is_checkpoint_nncf(filename):
-    nncf_metainfo = _get_nncf_metainfo_from_checkpoint(filename)
-    if not nncf_metainfo:
+
+def is_nncf_state(state):
+    nncf_metainfo = _get_nncf_metainfo_from_state(state)
+    if nncf_metainfo is None:
         return False
-    return nncf_metainfo.get('nncf_compression_enabled', False)
+    hyperparams = nncf_metainfo('hyperparams', {})
+    return hyperparams.get('enable_quantization', False) or hyperparams.get('enable_pruning', False)
 
-def _load_checkpoint_for_nncf(model, filename, map_location=None, strict=False):
-    """Load checkpoint from a file or URI.
 
-    Args:
-        model (Module): Module to load checkpoint.
-        filename (str): Either a filepath or URL or modelzoo://xxxxxxx.
-        map_location (str): Same as :func:`torch.load`.
-        strict (bool): Whether to allow different params for the model and
-            checkpoint.
+def is_nncf_checkpoint(path):
+    checkpoint = safe_load_checkpoint(path, map_location='cpu')
+    return is_nncf_state(checkpoint)
 
-    Returns:
-        dict or OrderedDict: The loaded checkpoint.
+
+def get_compression_hyperparams_from_state(state):
+    hyperparams = {
+        'enable_quantization': False,
+        'enable_pruning': False,
+    }
+
+    nncf_metainfo = _get_nncf_metainfo_from_state(state)
+    if nncf_metainfo is None:
+        return hyperparams
+
+    loaded_hyperparams = nncf_metainfo('hyperparams', {})
+    for key in loaded_hyperparams:
+        if key in hyperparams:
+            hyperparams[key] = loaded_hyperparams[key]
+    return hyperparams
+
+
+def get_compression_hyperparams(path):
+    checkpoint = safe_load_checkpoint(path, map_location='cpu')
+    return get_compression_hyperparams_from_state(checkpoint)
+
+
+def extract_model_and_compression_states(resuming_checkpoint):
     """
-    from nncf.torch import load_state
-
-    checkpoint = torch.load(filename, map_location=map_location)
-    # get state_dict from checkpoint
-    if isinstance(checkpoint, OrderedDict):
-        state_dict = checkpoint
-    elif isinstance(checkpoint, dict) and 'state_dict' in checkpoint:
-        state_dict = checkpoint['state_dict']
+    The function return from checkpoint state_dict and compression_state.
+    """
+    if 'model' in resuming_checkpoint:
+        model_state_dict = resuming_checkpoint['model']
+    elif 'state_dict' in resuming_checkpoint:
+        model_state_dict = resuming_checkpoint['state_dict']
     else:
-        raise RuntimeError(
-            f'No state_dict found in checkpoint file {filename}')
-    _ = load_state(model, state_dict, strict)
-    return checkpoint
+        model_state_dict = resuming_checkpoint
+    compression_state = resuming_checkpoint['compression_state']
+    return model_state_dict, compression_state
+
 
 def get_default_nncf_compression_config(h, w):
     """
@@ -96,71 +148,62 @@ def get_default_nncf_compression_config(h, w):
                 'algorithm': 'quantization',
                 'initializer': {
                     'range': {
-                        'num_init_samples': 8192, # Number of samples from the training dataset
-                                                  # to consume as sample model inputs for purposes of setting initial
-                                                  # minimum and maximum quantization ranges
-                        },
+                        'num_init_samples': 8192,
+                    },
                     'batchnorm_adaptation': {
-                        'num_bn_adaptation_samples': 8192, # Number of samples from the training
-                                                           # dataset to pass through the model at initialization in order to update
-                                                           # batchnorm statistics of the original model. The actual number of samples
-                                                           # will be a closest multiple of the batch size.
-                        #'num_bn_forget_samples': 1024, # Number of samples from the training
-                                                        # dataset to pass through the model at initialization in order to erase
-                                                        # batchnorm statistics of the original model (using large momentum value
-                                                        # for rolling mean updates). The actual number of samples will be a
-                                                        # closest multiple of the batch size.
-                        }
+                        'num_bn_adaptation_samples': 8192,
                     }
                 }
-            ],
+            }
+        ],
         'log_dir': '.'
     }
     return nncf_config_data
 
-def wrap_nncf_model(model, cfg, datamanager_for_init,
-                    checkpoint_path=None,
-                    nncf_config_path=None):
+
+def wrap_nncf_model(model, cfg,
+                    checkpoint_dict=None,
+                    datamanager_for_init=None):
     # Note that we require to import it here to avoid cyclic imports when import get_no_nncf_trace_context_manager
     # from mobilenetv3
     from torchreid.data.transforms import build_inference_transform
-    from torchreid.utils import read_json
-
-    if not (datamanager_for_init or checkpoint_path):
-        raise RuntimeError(f'One of datamanager_for_init or checkpoint_path should be set: '
-                           f'datamanager_for_init={datamanager_for_init} checkpoint_path={checkpoint_path}')
 
     from nncf import NNCFConfig
-
-    from nncf.torch import create_compressed_model
+    from nncf.torch import create_compressed_model, load_state
     from nncf.torch.initialization import register_default_init_args
     from nncf.torch.dynamic_graph.io_handling import nncf_model_input
     from nncf.torch.dynamic_graph.trace_tensor import TracedTensor
     from nncf.torch.initialization import PTInitializingDataLoader
 
-    nncf_metainfo = _get_nncf_metainfo_from_checkpoint(checkpoint_path)
-    if nncf_metainfo and nncf_metainfo.get('nncf_compression_enabled'):
+    if checkpoint_dict is None:
+        checkpoint_path = cfg.model.load_weights
+        resuming_checkpoint = safe_load_checkpoint(checkpoint_path, map_location=torch.device('cpu'))
+    else:
+        checkpoint_path = 'pretrained_dict'
+        resuming_checkpoint = checkpoint_dict
+
+    if datamanager_for_init is None and not is_nncf_state(resuming_checkpoint):
+        raise RuntimeError('Either datamanager_for_init or NNCF pre-trained '
+                           'model checkpoint should be set')
+
+    nncf_metainfo = None
+    if is_nncf_state(resuming_checkpoint):
+        nncf_metainfo = _get_nncf_metainfo_from_state(resuming_checkpoint)
         nncf_config_data = nncf_metainfo['nncf_config']
         datamanager_for_init = None
-        print(f'Read NNCF metainfo with NNCF config from the checkpoint: nncf_metainfo=\n{pformat(nncf_metainfo)}')
+        logger.info(f'Read NNCF metainfo with NNCF config from the checkpoint: nncf_metainfo=\n{pformat(nncf_metainfo)}')
     else:
-        checkpoint_path = None # it is non-NNCF model
+        resuming_checkpoint = None
+        nncf_config_data = cfg.get('nncf_config')
 
-        nncf_config_data = None
-        if nncf_config_path:
-            nncf_config_data = read_json(nncf_config_path)
-            print(f'Read nncf config from the NNCF config file {nncf_config_path}:\n'
-                  f' nncf_config=\n{pformat(nncf_config_data)}')
         if nncf_config_data is None:
-            print('Cannot read nncf_config from config file')
-
-    if datamanager_for_init and checkpoint_path:
-        raise RuntimeError(f'Only ONE of datamanager_for_init or checkpoint_path should be set: '
-                           f'datamanager_for_init={datamanager_for_init} checkpoint_path={checkpoint_path}')
+            logger.info('Cannot read nncf_config from config file')
+        else:
+            logger.info(f' nncf_config=\n{pformat(nncf_config_data)}')
 
     h, w = cfg.data.height, cfg.data.width
     if not nncf_config_data:
-        print('Using the default NNCF int8 quantization config')
+        logger.info('Using the default NNCF int8 quantization config')
         nncf_config_data = get_default_nncf_compression_config(h, w)
 
     # do it even if nncf_config_data is loaded from a checkpoint -- for the rare case when
@@ -170,9 +213,10 @@ def wrap_nncf_model(model, cfg, datamanager_for_init,
     nncf_config_data['input_info']['sample_size'] = [1, 3, h, w]
 
     nncf_config = NNCFConfig(nncf_config_data)
-    print(f'nncf_config =\n{pformat(nncf_config)}')
+    logger.info(f'nncf_config =\n{pformat(nncf_config)}')
     if not nncf_metainfo:
-        nncf_metainfo = create_nncf_metainfo(nncf_compression_enabled=True,
+        nncf_metainfo = create_nncf_metainfo(enable_quantization=True,
+                                             enable_pruning=False,
                                              nncf_config=nncf_config_data)
     else:
         # update it just to be on the safe side
@@ -183,22 +227,47 @@ def wrap_nncf_model(model, cfg, datamanager_for_init,
             # define own InitializingDataLoader class using approach like
             # parse_data_for_train and parse_data_for_eval in the class Engine
             # dataloader_output[0] should be image here
-            args = (dataloader_output[0], )
+            args = (dataloader_output[0],)
             return args, {}
 
-    cur_device = next(model.parameters()).device
-    print(f'NNCF: cur_device = {cur_device}')
+    @torch.no_grad()
+    def model_eval_fn(model):
+        """
+        Runs evaluation of the model on the validation set and
+        returns the target metric value.
+        Used to evaluate the original model before compression
+        if NNCF-based accuracy-aware training is used.
+        """
+        from torchreid.metrics.classification import evaluate_classification
 
-    if checkpoint_path is None:
-        print('No NNCF checkpoint is provided -- register initialize data loader')
+        if test_loader is None:
+            raise RuntimeError('Cannot perform model evaluation on the validation '
+                               'dataset since the validation data loader was not passed '
+                               'to wrap_nncf_model')
+
+        targets = list(test_loader.keys())
+        use_gpu = True if 'cuda' == cur_device.type else False
+        for dataset_name in targets:
+            domain = 'source' if dataset_name in datamanager_for_init.sources else 'target'
+            print('##### Evaluating {} ({}) #####'.format(dataset_name, domain))
+            cmc, m_ap, norm_cm = evaluate_classification(test_loader[dataset_name]['query'], model,
+                                                         use_gpu=use_gpu)
+        return cmc[0]
+
+    cur_device = next(model.parameters()).device
+    logger.info(f'NNCF: cur_device = {cur_device}')
+
+    if resuming_checkpoint is None:
+        logger.info('No NNCF checkpoint is provided -- register initialize data loader')
         train_loader = datamanager_for_init.train_loader
+        test_loader = datamanager_for_init.test_loader
         wrapped_loader = ReidInitializeDataLoader(train_loader)
-        nncf_config = register_default_init_args(nncf_config, wrapped_loader, device=cur_device)
-        resuming_state_dict = None
+        nncf_config = register_default_init_args(nncf_config, wrapped_loader,
+                                                 model_eval_fn=model_eval_fn, device=cur_device)
+        model_state_dict = None
+        compression_state = None
     else:
-        print(f'Loading NNCF model from {checkpoint_path}')
-        resuming_state_dict = _load_checkpoint_for_nncf(model, checkpoint_path, map_location=cur_device)
-        print(f'Loaded NNCF model from {checkpoint_path}')
+        model_state_dict, compression_state = extract_model_and_compression_states(resuming_checkpoint)
 
     transform = build_inference_transform(
         cfg.data.height,
@@ -218,28 +287,30 @@ def wrap_nncf_model(model, cfg, datamanager_for_init,
         model(input_blob)
         model.train(prev_training_state)
 
-    # TODO(lbeynens): improve this function to
-    # avoid possible NNCF graph nodes duplication
     def wrap_inputs(args, kwargs):
-        assert not kwargs
         assert len(args) == 1
         if isinstance(args[0], TracedTensor):
-            print('wrap_inputs: do not wrap input TracedTensor')
+            logger.info('wrap_inputs: do not wrap input TracedTensor')
             return args, {}
-        return (nncf_model_input(args[0]), ), {}
+        return (nncf_model_input(args[0]),), kwargs
 
     model.dummy_forward_fn = dummy_forward
     if 'log_dir' in nncf_config:
         os.makedirs(nncf_config['log_dir'], exist_ok=True)
-    print(f'nncf_config["log_dir"] = {nncf_config["log_dir"]}')
+    logger.info(f'nncf_config["log_dir"] = {nncf_config["log_dir"]}')
 
     compression_ctrl, model = create_compressed_model(model,
                                                       nncf_config,
                                                       dummy_forward_fn=dummy_forward,
                                                       wrap_inputs_fn=wrap_inputs,
-                                                      compression_state=resuming_state_dict)
+                                                      compression_state=compression_state)
+
+    if model_state_dict:
+        logger.info(f'Loading NNCF model from {checkpoint_path}')
+        load_state(model, model_state_dict, is_resume=True)
 
     return compression_ctrl, model, nncf_metainfo
+
 
 def get_nncf_complession_stage():
     try:
@@ -248,9 +319,18 @@ def get_nncf_complession_stage():
     except ImportError:
         return lambda _: None
 
+
 def get_nncf_prepare_for_tensorboard():
     try:
         from nncf.common.utils.tensorboard import prepare_for_tensorboard
         return prepare_for_tensorboard
     except ImportError:
         return lambda _: None
+
+
+def is_accuracy_aware_training_set(nncf_config):
+    if not is_nncf_enabled():
+        return False
+    from nncf.config.utils import is_accuracy_aware_training
+    is_acc_aware_training_set = is_accuracy_aware_training(nncf_config)
+    return is_acc_aware_training_set

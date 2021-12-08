@@ -131,7 +131,7 @@ def download_weights(url, chkpt_name='model_weights'):
     return cached_file
 
 
-def load_checkpoint(fpath):
+def load_checkpoint(fpath, map_location=''):
     r"""Loads checkpoint.
 
     ``UnicodeDecodeError`` can be well handled, which means
@@ -152,7 +152,8 @@ def load_checkpoint(fpath):
         raise ValueError('File path is None')
     if not osp.exists(fpath):
         raise FileNotFoundError('File is not found at "{}"'.format(fpath))
-    map_location = None if torch.cuda.is_available() else 'cpu'
+    if not map_location:
+        map_location = None if torch.cuda.is_available() else 'cpu'
     try:
         checkpoint = torch.load(fpath, map_location=map_location)
     except UnicodeDecodeError:
@@ -397,6 +398,8 @@ def load_pretrained_weights(model, file_path='', chkpt_name='model_weights', pre
         model.classification_classes = checkpoint['classes_map']
     if 'state_dict' in checkpoint:
         state_dict = checkpoint['state_dict']
+    elif 'model' in checkpoint:
+        state_dict = checkpoint['model']
     else:
         state_dict = checkpoint
 

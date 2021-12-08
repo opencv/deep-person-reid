@@ -1,5 +1,16 @@
 from __future__ import absolute_import, print_function
 
+try:
+    import torch
+except ImportError:
+    raise ImportError('PyTorch was not found. Please, install PyTorch and other requirements '
+                      'from the requirements.txt file')
+try:
+    import nncf
+except ImportError:
+    import warnings
+    warnings.warn("NNCF was not found. Model optimization options will not be available.")
+
 from torchreid import data, engine, losses, metrics, models, ops, optim, utils
 from .version import __version__
 

@@ -38,7 +38,7 @@ from ote_sdk.entities.train_parameters import TrainParameters
 from ote_sdk.configuration.helper import convert, create
 
 from torchreid.integration.sc.parameters import OTEClassificationParameters
-from torchreid.integration.sc.task import OTEClassificationTask
+from torchreid.integration.sc.train_task import OTEClassificationTrainTask
 from torchreid.integration.sc.utils import generate_label_schema
 
 
@@ -119,7 +119,7 @@ def init_environment(params, model_template, number_of_images=10):
 def default_task_setup():
     hyper_parameters, model_template = setup_configurable_parameters(DEFAULT_TEMPLATE_DIR, max_num_epochs=5)
     task_environment, dataset = init_environment(hyper_parameters, model_template, 20)
-    task = OTEClassificationTask(task_environment=task_environment)
+    task = OTEClassificationTrainTask(task_environment=task_environment)
 
     yield (task, task_environment, dataset)
 

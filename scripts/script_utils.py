@@ -65,14 +65,15 @@ def build_datamanager(cfg, classification_classes_filter=None):
 
 def build_auxiliary_model(config_file, num_classes, use_gpu,
                           device_ids, num_iter, lr=None,
-                          nncf_aux_config_file=None,
-                          aux_config_opts=None):
+                          nncf_aux_config_changes=None,
+                          aux_config_opts=None,
+                          aux_pretrained_dict=None):
     aux_cfg = get_default_config()
     aux_cfg.use_gpu = use_gpu
     merge_from_files_with_base(aux_cfg, config_file)
-    if nncf_aux_config_file:
-        print(f'applying to aux config changes from NNCF aux config file {nncf_aux_config_file}')
-        merge_from_files_with_base(aux_cfg, nncf_aux_config_file)
+    if nncf_aux_config_changes:
+        print(f'applying to aux config changes from NNCF aux config {nncf_aux_config_changes}')
+        aux_cfg.merge_from_other_cfg(nncf_aux_config_changes)
     if aux_config_opts:
         print(f'applying to aux config changes from command line arguments, '
                 f'the changes are:\n{pformat(aux_config_opts)}')
@@ -92,6 +93,9 @@ def build_auxiliary_model(config_file, num_classes, use_gpu,
     if aux_cfg.model.resume and check_isfile(aux_cfg.model.resume):
         aux_cfg.train.start_epoch = resume_from_checkpoint(
             aux_cfg.model.resume, model, optimizer=optimizer, scheduler=scheduler)
+
+    elif aux_pretrained_dict is not None:
+        load_pretrained_weights(model, pretrained_dict=aux_pretrained_dict)
 
     elif aux_cfg.model.load_weights and check_isfile(aux_cfg.model.load_weights):
         load_pretrained_weights(model, aux_cfg.model.load_weights)

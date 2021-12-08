@@ -99,3 +99,55 @@ pot_parameters:
   visible_in_ui: true
 type: CONFIGURABLE_PARAMETERS
 visible_in_ui: true
+nncf_optimization:
+  description: Optimization by NNCF
+  header: Optimization by NNCF
+  enable_quantization:
+    affects_outcome_of: TRAINING
+    default_value: true
+    description: Enable quantization algorithm
+    editable: true
+    header: Enable quantization algorithm
+    type: BOOLEAN
+    ui_rules:
+      action: DISABLE_EDITING
+      operator: AND
+      rules: []
+      type: UI_RULES
+    value: true
+    visible_in_ui: true
+    warning: null
+  enable_pruning:
+    affects_outcome_of: TRAINING
+    default_value: false
+    description: Enable filter pruning algorithm
+    editable: true
+    header: Enable filter pruning algorithm
+    type: BOOLEAN
+    ui_rules:
+      action: DISABLE_EDITING
+      operator: AND
+      rules: []
+      type: UI_RULES
+    value: false
+    visible_in_ui: true
+    warning: null
+  maximal_accuracy_degradation:
+    affects_outcome_of: TRAINING
+    default_value: 1.0
+    description: The maximal allowed accuracy metric drop
+    editable: true
+    header: Maximum accuracy degradation
+    max_value: 100.0
+    min_value: 0.0
+    type: FLOAT
+    ui_rules:
+      action: DISABLE_EDITING
+      operator: AND
+      rules: []
+      type: UI_RULES
+    value: 1.0
+    visible_in_ui: true
+    warning: null
+  type: PARAMETER_GROUP
+  visible_in_ui: true

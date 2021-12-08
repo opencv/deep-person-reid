@@ -1,165 +1,153 @@
+# Copyright (C) 2021 Intel Corporation
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+
+import logging
 from pprint import pformat
 
-from torchreid.engine import get_initial_lr_from_checkpoint
-from torchreid.utils import check_isfile, load_pretrained_weights, read_yaml
-
-from scripts.default_config import merge_from_files_with_base
 from scripts.script_utils import build_datamanager, is_config_parameter_set_from_command_line
+from torchreid.integration.nncf.compression import is_nncf_state, wrap_nncf_model
+from torchreid.integration.nncf.config import compose_nncf_config, load_nncf_config
+from torchreid.integration.nncf.config import merge_dicts_and_lists_b_into_a
+from torchreid.utils import load_checkpoint, load_pretrained_weights
 
-from torchreid.integration.nncf.compression import (is_checkpoint_nncf, wrap_nncf_model)
+logger = logging.getLogger(__name__)
+
 
 def get_coeff_decrease_lr_for_nncf(nncf_training_config):
     if nncf_training_config and nncf_training_config.get('coeff_decrease_lr_for_nncf'):
-        return nncf_training_config.get('coeff_decrease_lr_for_nncf')
+        coef = nncf_training_config.get('coeff_decrease_lr_for_nncf')
+        if isinstance(coef, float):
+            return coef
     raise RuntimeError('The default value for coeff_decrease_lr_for_nncf is not set')
 
-def calculate_lr_for_nncf_training(lr_from_cfg, checkpoint_path,
-                                   coeff_decrease_lr_for_nncf,
-                                   is_initial_lr_set_from_opts):
+
+def calculate_lr_for_nncf_training(cfg, initial_lr_from_checkpoint, is_initial_lr_set_from_opts):
+    lr_from_cfg = cfg.train.lr
+    nncf_training_config = cfg.get('nncf', {})
+    coeff_decrease_lr_for_nncf = get_coeff_decrease_lr_for_nncf(nncf_training_config)
+
     if is_initial_lr_set_from_opts:
-        print(f'Since initial LR is set from command line arguments, do not calculate initial LR for NNCF, '
+        logger.info(f'Since initial LR is set from command line arguments, do not calculate initial LR for NNCF, '
               f'taking lr from cfg, lr={lr_from_cfg}')
         return lr_from_cfg
 
-    initial_lr_from_checkpoint = get_initial_lr_from_checkpoint(checkpoint_path)
-    print(f'initial_lr_from_checkpoint = {initial_lr_from_checkpoint}')
+    logger.info(f'initial_lr_from_checkpoint = {initial_lr_from_checkpoint}')
     if initial_lr_from_checkpoint is None:
-        print(f'The checkpoint does not contain initial lr -- will not calculate initial LR for NNCF, '
+        logger.info(f'The checkpoint does not contain initial lr -- will not calculate initial LR for NNCF, '
               f'taking lr from cfg, lr={lr_from_cfg}')
         return lr_from_cfg
 
-    if is_checkpoint_nncf(checkpoint_path):
-        print('The loaded checkpoint was received from NNCF training')
-        print('WARNING: Loading NNCF checkpoint for fine-tuning -- since LR is NOT set from command line arguments '
-              'the initial LR stored in checkpoint will be used again')
-        print('Please, set LR from command line arguments to avoid this behavior')
-        lr = initial_lr_from_checkpoint
-        print(f'lr = {lr}')
-        return lr
-
-    print('Try to calculate initial LR for NNCF')
-    print(f'coeff_decrease_lr_for_nncf = {coeff_decrease_lr_for_nncf}')
+    logger.info('Try to calculate initial LR for NNCF')
+    logger.info(f'coeff_decrease_lr_for_nncf = {coeff_decrease_lr_for_nncf}')
     lr = initial_lr_from_checkpoint * coeff_decrease_lr_for_nncf
-    print(f'calculated lr = {lr}')
+    logger.info(f'calculated lr = {lr}')
     return lr
 
-def _sanity_check_nncf_changes_in_config(path_change_file):
-    # sanity check -- to avoid complicated/recursive side effects
-    if not path_change_file:
-        return
 
-    cfg_changes = read_yaml(path_change_file)
+def get_nncf_preset_name(enable_quantization, enable_pruning):
+    if not isinstance(enable_quantization, bool) or not isinstance(enable_pruning, bool):
+        return None
+    if enable_quantization and enable_pruning:
+        return 'nncf_quantization_pruning'
+    if enable_quantization and not enable_pruning:
+        return'nncf_quantization'
+    if not enable_quantization and enable_pruning:
+        return 'nncf_pruning'
+    return None
 
-    if (cfg_changes.get('model', {}).get('load_weights') or
-        cfg_changes.get('model', {}).get('resume') or
-        cfg_changes.get('nncf') or
-        cfg_changes.get('aux_configs')
-        ):
-        raise RuntimeError(f'Try to make too complicated changes for NNCF training, '
-                           f'NNCF changes to main config =\n{pformat(cfg_changes)}')
 
-def make_nncf_changes_in_main_training_config(cfg, command_line_cfg_opts):
-    # Take the part of the main config, related to NNCF.
-    # Please, note that at the moment the part should be a dict of the following form:
-    # ```
-    # nncf = {
-    #     'nncf_config_path': '...' #this is the path to a json file with NNCF config dict itself
-    #     'coeff_decrease_lr_for_nncf': <float value> # this is a coefficient to decrease the LR for NNCF training
-    #     'changes_in_main_train_config': '...' # a path to a YAML file with changes of main cfg for NNCF training
-    #     'changes_in_aux_train_config': '...'  # a path to a YAML file with changes of aux cfg for NNCF training
-    # }
-    # ```
-    # -- in case if some section of this NNCF part is absent the default values will be used
-    nncf_training_config = cfg.get('nncf', {})
+def make_nncf_changes_in_config(cfg,
+                                enable_quantization=False,
+                                enable_pruning=False,
+                                command_line_cfg_opts=None):
 
-    nncf_changes_in_main_train_config = nncf_training_config.get('changes_in_main_train_config')
-    cfg.train.ema.enable = False # turn off the EMA model since it is useless when compressing
-    if nncf_changes_in_main_train_config:
-        _sanity_check_nncf_changes_in_config(nncf_changes_in_main_train_config)
+    if not enable_quantization and not enable_pruning:
+        raise ValueError('None of the optimization algorithms are enabled')
 
-        print(f'applying changes to the main training config from the file {nncf_changes_in_main_train_config}')
-        merge_from_files_with_base(cfg, nncf_changes_in_main_train_config)
-        # then command line options should be applied again,
-        # since the options set from the command line should have preference
-        print(f'applying changes to the main training config from the command line options just after that. '
+    # default changes
+    if cfg.train.ema.enable:
+        logger.info('Turn off the EMA model -- it should not be used together with NNCF compression')
+        cfg.train.ema.enable = False
+    if cfg.lr_finder.enable:
+        logger.info('Turn off LR finder -- it should not be used together with NNCF compression')
+        cfg.lr_finder.enable = False
+
+    cfg.nncf.enable_quantization = enable_quantization
+    cfg.nncf.enable_pruning = enable_pruning
+    nncf_preset = get_nncf_preset_name(enable_quantization, enable_pruning)
+
+    patch_config(cfg, nncf_preset)
+
+    if command_line_cfg_opts is not None:
+        logger.info(f'applying changes to the main training config from the command line options just after that. '
               f'The list of options = \n{pformat(command_line_cfg_opts)}')
         cfg.merge_from_list(command_line_cfg_opts)
 
     return cfg
 
-def get_nncf_changes_in_aux_training_config(cfg):
-    # See details on nncf_training_config in the comment in
-    # the function make_nncf_changes_in_main_training_config
-    nncf_training_config = cfg.get('nncf', {})
-    nncf_changes_in_aux_train_config = nncf_training_config.get('changes_in_aux_train_config')
-    _sanity_check_nncf_changes_in_config(nncf_changes_in_aux_train_config)
-    return nncf_changes_in_aux_train_config
+
+def patch_config(cfg, nncf_preset, max_acc_drop=None):
+    #use default config here
+    nncf_config = load_nncf_config(cfg.nncf.nncf_config_path)
+
+    optimization_config = compose_nncf_config(nncf_config, [nncf_preset])
+
+    if "accuracy_aware_training" in optimization_config["nncf_config"]:
+        # Update maximal_absolute_accuracy_degradation
+        (optimization_config["nncf_config"]["accuracy_aware_training"]
+        ["params"]["maximal_absolute_accuracy_degradation"]) = max_acc_drop
+    else:
+        logger.info("NNCF config has no accuracy_aware_training parameters")
+
+    return merge_dicts_and_lists_b_into_a(cfg, optimization_config)
+
 
 def make_nncf_changes_in_training(model, cfg, classes, command_line_cfg_opts):
-    # See details on nncf_training_config in the comment in
-    # the function make_nncf_changes_in_main_training_config
-    nncf_training_config = cfg.get('nncf', {})
-    nncf_config_path = nncf_training_config.get('nncf_config_path')
-    print(f'NNCF config path = {nncf_config_path}')
+    if cfg.train.ema.enable:
+        raise RuntimeError('EMA model could not be used together with NNCF compression')
+    if cfg.lr_finder.enable:
+        raise RuntimeError('LR finder could not be used together with NNCF compression')
 
-    lr = None
     if cfg.model.resume:
         raise NotImplementedError('Resuming NNCF training is not implemented yet')
     if not cfg.model.load_weights:
-        raise RuntimeError('NNCF training should be started from a non-NNCF or NNCF pre-trained model')
+        raise RuntimeError('NNCF training should be started from a pre-trained model')
     checkpoint_path = cfg.model.load_weights
-    if not check_isfile(checkpoint_path):
-        raise RuntimeError(f'Cannot find checkpoint at {checkpoint_path}')
+    checkpoint_dict = load_checkpoint(checkpoint_path, map_location='cpu')
+    if is_nncf_state(checkpoint_dict):
+        raise RuntimeError(f'The checkpoint is NNCF checkpoint at {checkpoint_path}')
 
-    is_curr_checkpoint_nncf = is_checkpoint_nncf(checkpoint_path)
-    print(f'First stage of NNCF model wrapping -- loading weights from {checkpoint_path}')
-    if is_curr_checkpoint_nncf:
-        print('Note that it is an NNCF checkpoint, so warnings that some layers are discarded '
-              'during loading due to unmatched keys will be printed -- it is normal for this case')
-
-    load_pretrained_weights(model, checkpoint_path)
-
-    if is_curr_checkpoint_nncf:
-        print(f'Using NNCF checkpoint {checkpoint_path}')
-        # just skipping loading special datamanager
-        datamanager_for_nncf = None
-        checkpoint_path_for_wrapping = checkpoint_path
-    else:
-        print('before building datamanager for nncf initializing')
-        datamanager_for_nncf = build_datamanager(cfg, classes)
-        print('after building datamanager for nncf initializing')
-        checkpoint_path_for_wrapping = None
+    logger.info(f'Loading weights from {checkpoint_path}')
+    load_pretrained_weights(model, pretrained_dict=checkpoint_dict)
+    datamanager_for_init = build_datamanager(cfg, classes)
 
     compression_ctrl, model, nncf_metainfo = \
-            wrap_nncf_model(model, cfg, datamanager_for_nncf,
-                            checkpoint_path=checkpoint_path_for_wrapping,
-                            nncf_config_path=nncf_config_path)
-    print(f'Received from wrapping nncf_metainfo =\n{pformat(nncf_metainfo)}')
-    if cfg.lr_finder.enable:
-        print('Turn off LR finder -- it should not be used together with NNCF compression')
-        cfg.lr_finder.enable = False
+        wrap_nncf_model(model, cfg, datamanager_for_init=datamanager_for_init)
+    logger.info(f'Received from wrapping nncf_metainfo =\n{pformat(nncf_metainfo)}')
 
     # calculating initial LR for NNCF training
+    lr = None
+    initial_lr_from_checkpoint = checkpoint_dict.get('initial_lr')
     is_initial_lr_set_from_opts = is_config_parameter_set_from_command_line(command_line_cfg_opts, 'train.lr')
-    coeff_decrease_lr_for_nncf = get_coeff_decrease_lr_for_nncf(nncf_training_config)
-    assert isinstance(coeff_decrease_lr_for_nncf, float)
-    lr = calculate_lr_for_nncf_training(cfg.train.lr, checkpoint_path,
-                                        coeff_decrease_lr_for_nncf,
+    lr = calculate_lr_for_nncf_training(cfg, initial_lr_from_checkpoint,
                                         is_initial_lr_set_from_opts)
     assert lr is not None
     cfg.train.lr = lr
     return compression_ctrl, model, cfg, lr, nncf_metainfo
 
+
 def make_nncf_changes_in_eval(model, cfg):
-    # See details on nncf_training_config in the comment in
-    # the function make_nncf_changes_in_main_training_config
-    nncf_training_config = cfg.get('nncf', {})
-    nncf_config_path = nncf_training_config.get('nncf_config_path')
-    print(f'NNCF config path = {nncf_config_path}')
-    checkpoint_path = cfg.model.load_weights
-    datamanager_for_nncf = None
     _, model, _ = \
-            wrap_nncf_model(model, cfg, datamanager_for_nncf,
-                            checkpoint_path=checkpoint_path,
-                            nncf_config_path=nncf_config_path)
+            wrap_nncf_model(model, cfg)
     return model

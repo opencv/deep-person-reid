@@ -18,13 +18,10 @@ from scripts.script_utils import (build_base_argparser, reset_config,
 
 import torchreid
 from torchreid.apis.training import run_lr_finder, run_training
-from torchreid.utils import (Logger, check_isfile, collect_env_info,
-                             resume_from_checkpoint,
+from torchreid.utils import (Logger, check_isfile, resume_from_checkpoint,
                              set_random_seed, load_pretrained_weights)
-from torchreid.integration.nncf.compression import is_checkpoint_nncf
-from torchreid.integration.nncf.compression_script_utils import (get_nncf_changes_in_aux_training_config,
-                                                                 make_nncf_changes_in_training,
-                                                                 make_nncf_changes_in_main_training_config)
+from torchreid.integration.nncf.compression_script_utils import (make_nncf_changes_in_config,
+                                                                 make_nncf_changes_in_training)
 
 
 def main():
@@ -33,9 +30,10 @@ def main():
                         help='path to extra config files')
     parser.add_argument('--split-models', action='store_true',
                         help='whether to split models on own gpu')
-
-    parser.add_argument('--nncf', action='store_true',
-                        help='If nncf compression should be used')
+    parser.add_argument('--enable_quantization', action='store_true',
+                        help='Enable NNCF quantization algorithm')
+    parser.add_argument('--enable_pruning', action='store_true',
+                        help='Enable NNCF pruning algorithm')
     parser.add_argument('--aux-config-opts', nargs='+', default=None,
                         help='Modify aux config options using the command-line')
     args = parser.parse_args()
@@ -47,13 +45,13 @@ def main():
     reset_config(cfg, args)
     cfg.merge_from_list(args.opts)
 
-    is_nncf_used = args.nncf or cfg.nncf.enable or is_checkpoint_nncf(cfg.model.load_weights)
+    is_nncf_used = args.enable_quantization or args.enable_pruning
     if is_nncf_used:
         print(f'Using NNCF -- making NNCF changes in config')
-        cfg = make_nncf_changes_in_main_training_config(cfg, args.opts)
-        nncf_changes_in_aux_train_config = get_nncf_changes_in_aux_training_config(cfg)
-    else:
-        nncf_changes_in_aux_train_config = None
+        cfg = make_nncf_changes_in_config(cfg,
+                                          args.enable_quantization,
+                                          args.enable_pruning,
+                                          args.opts)
 
     set_random_seed(cfg.train.seed, cfg.train.deterministic)
 
@@ -117,17 +115,19 @@ def main():
     if cfg.model.type == 'classification':
         check_classification_classes(model, datamanager, args.classes, test_only=cfg.test.evaluate)
 
-    model, extra_device_ids = put_main_model_on_the_device(model, cfg.use_gpu, args.gpu_num, num_aux_models, args.split_models)
+    model, extra_device_ids = put_main_model_on_the_device(model, cfg.use_gpu, args.gpu_num,
+                                                           num_aux_models, args.split_models)
 
     if cfg.lr_finder.enable and not cfg.test.evaluate and not cfg.model.resume:
-        aux_lr, model, optimizer, scheduler = run_lr_finder(cfg, datamanager, model, optimizer, scheduler, args.classes,
-                                                            rebuild_model=True, gpu_num=args.gpu_num, split_models=args.split_models)
-
+        aux_lr, model, optimizer, scheduler = run_lr_finder(cfg, datamanager, model,
+                                                            optimizer, scheduler, args.classes,
+                                                            rebuild_model=True,
+                                                            gpu_num=args.gpu_num,
+                                                            split_models=args.split_models)
 
     log_dir = cfg.data.tb_log_dir if cfg.data.tb_log_dir else cfg.data.save_dir
     run_training(cfg, datamanager, model, optimizer, scheduler, extra_device_ids,
                  aux_lr, tb_writer=SummaryWriter(log_dir=log_dir),
-                 nncf_changes_in_aux_train_config=nncf_changes_in_aux_train_config,
                  should_freeze_aux_models=should_freeze_aux_models,
                  nncf_metainfo=nncf_metainfo,
                  compression_ctrl=compression_ctrl)

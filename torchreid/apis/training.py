@@ -19,6 +19,8 @@ from copy import deepcopy
 
 import torchreid
 from torchreid.engine import build_engine
+from torchreid.integration.nncf.compression import is_accuracy_aware_training_set
+from torchreid.integration.nncf.engine import run_acc_aware_training_loop
 from torchreid.optim import LrFinder
 from scripts.default_config import (lr_finder_run_kwargs,
                                     lr_scheduler_kwargs, model_kwargs,
@@ -69,7 +71,7 @@ def run_lr_finder(cfg, datamanager, model, optimizer, scheduler, classes,
 def run_training(cfg, datamanager, model, optimizer, scheduler, extra_device_ids, init_lr,
                  tb_writer=None, perf_monitor=None, stop_callback=None,
                  aux_config_opts=None,
-                 nncf_changes_in_aux_train_config=None,
+                 aux_pretrained_dicts=None,
                  should_freeze_aux_models=None,
                  nncf_metainfo=None,
                  compression_ctrl=None):
@@ -79,12 +81,18 @@ def run_training(cfg, datamanager, model, optimizer, scheduler, extra_device_ids
     if num_aux_models > 0:
         print(f'Enabled mutual learning between {len(cfg.mutual_learning.aux_configs) + 1} models.')
 
+        nncf_aux_config_changes = cfg.get('nncf_aux_config_changes', [None] * num_aux_models)
+        if aux_pretrained_dicts is None:
+            aux_pretrained_dicts = [None] * num_aux_models
         models, optimizers, schedulers = [model], [optimizer], [scheduler]
-        for config_file, device_ids in zip(cfg.mutual_learning.aux_configs, extra_device_ids):
+        for config_file, device_ids, pretrained_dict, nncf_config_changes in zip(cfg.mutual_learning.aux_configs,
+                                                                                 extra_device_ids,
+                                                                                 aux_pretrained_dicts,
+                                                                                 nncf_aux_config_changes):
             aux_model, aux_optimizer, aux_scheduler = build_auxiliary_model(
                 config_file, num_train_classes, cfg.use_gpu, device_ids, num_iter=datamanager.num_iter,
-                lr=init_lr, nncf_aux_config_file=nncf_changes_in_aux_train_config,
-                aux_config_opts=aux_config_opts
+                lr=init_lr, nncf_aux_config_changes=nncf_config_changes,
+                aux_config_opts=aux_config_opts, aux_pretrained_dict=pretrained_dict
             )
 
             models.append(aux_model)
@@ -100,6 +108,7 @@ def run_training(cfg, datamanager, model, optimizer, scheduler, extra_device_ids
                           initial_lr=init_lr)
 
     accuracy = None
+    final_accuracy = None
     if cfg.test.test_before_train or cfg.test.evaluate:
         if cfg.test.test_before_train:
             print('Test before training')
@@ -107,7 +116,17 @@ def run_training(cfg, datamanager, model, optimizer, scheduler, extra_device_ids
         if cfg.test.evaluate:
             return accuracy, None
 
-    _, final_accuracy = engine.run(**engine_run_kwargs(cfg), tb_writer=tb_writer,
-                                   perf_monitor=perf_monitor, stop_callback=stop_callback)
+    nncf_config = cfg.get('nncf_config')
+    if nncf_config is not None and is_accuracy_aware_training_set(nncf_config):
+        def configure_optimizers_fn():
+            optimizer = torchreid.optim.build_optimizer(model, **optimizer_kwargs(cfg))
+            scheduler = torchreid.optim.build_lr_scheduler(optimizer, num_iter=datamanager.num_iter,
+                                                           **lr_scheduler_kwargs(cfg))
+            return optimizer, scheduler
+
+        run_acc_aware_training_loop(engine, nncf_config, configure_optimizers_fn)
+    else:
+        _, final_accuracy = engine.run(**engine_run_kwargs(cfg), tb_writer=tb_writer,
+                                       perf_monitor=perf_monitor, stop_callback=stop_callback)
 
     return accuracy, final_accuracy
