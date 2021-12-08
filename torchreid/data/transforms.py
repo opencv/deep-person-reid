@@ -667,7 +667,7 @@ class RandomFigures(object):
                 r = random.randint(*self.circle_radiuses)
                 cv_image = f(cv_image, p1, r, color, thickness)
 
-        return Image.fromarray(cv_image), mask
+        return cv_image, mask
 
 
 class CutOutWithPrior(object):
