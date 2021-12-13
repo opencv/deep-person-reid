@@ -1,7 +1,6 @@
 {
     "base": {
         "nncf_config": {
-            "target_metric_name": "mAP",
             "compression": [],
             "log_dir": "."
         }

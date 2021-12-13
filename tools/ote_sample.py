@@ -35,12 +35,9 @@ from torchreid.integration.sc.utils import (ClassificationDatasetAdapter,
                                             generate_label_schema,
                                             get_task_class)
 
-logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
-logger = logging.getLogger(__name__)
-
-
 def parse_args():
     parser = argparse.ArgumentParser(description='Sample showcasing the new API')
+    parser.add_argument('--mode', choices=['train', 'test'], default='train')
     parser.add_argument('template_file_path', help='path to template file')
     parser.add_argument('--data-dir', default='data')
     parser.add_argument('--weights',
@@ -59,7 +56,7 @@ def load_weights(path):
 
 
 def validate(task, validation_dataset, model):
-    logger.info('Get predictions on the validation set')
+    print('Get predictions on the validation set')
     predicted_validation_dataset = task.infer(
         validation_dataset.with_empty_annotations(),
         InferenceParameters(is_evaluation=True))
@@ -68,9 +65,9 @@ def validate(task, validation_dataset, model):
         ground_truth_dataset=validation_dataset,
         prediction_dataset=predicted_validation_dataset,
     )
-    logger.info('Estimate quality on validation set')
+    print('Estimate quality on validation set')
     task.evaluate(resultset)
-    logger.info(str(resultset.performance))
+    print(str(resultset.performance))
 
 
 def main(args):
@@ -78,7 +75,7 @@ def main(args):
         from torchreid.utils import Logger
         log_name = 'ote_task.log' + time.strftime('-%Y-%m-%d-%H-%M-%S')
         sys.stdout = Logger(osp.join(args.debug_dump_folder, log_name))
-    logger.info('Initialize dataset')
+    print('Initialize dataset')
     dataset = ClassificationDatasetAdapter(
         train_data_root=osp.join(args.data_dir, 'train'),
         train_ann_file=osp.join(args.data_dir, 'train.json'),
@@ -88,16 +85,16 @@ def main(args):
         test_ann_file=osp.join(args.data_dir, 'val.json'))
 
     labels_schema = generate_label_schema(dataset.get_labels(), dataset.is_multilabel())
-    logger.info(f'Train dataset: {len(dataset.get_subset(Subset.TRAINING))} items')
-    logger.info(f'Validation dataset: {len(dataset.get_subset(Subset.VALIDATION))} items')
+    print(f'Train dataset: {len(dataset.get_subset(Subset.TRAINING))} items')
+    print(f'Validation dataset: {len(dataset.get_subset(Subset.VALIDATION))} items')
 
-    logger.info('Load model template')
+    print('Load model template')
     model_template = parse_model_template(args.template_file_path)
 
-    logger.info('Set hyperparameters')
+    print('Set hyperparameters')
 
     params = create(model_template.hyper_parameters.data)
-    logger.info('Setup environment')
+    print('Setup environment')
     environment = TaskEnvironment(model=None,
                                   hyper_parameters=params,
                                   label_schema=labels_schema,
@@ -112,8 +109,8 @@ def main(args):
             configuration=environment.get_model_configuration(),
             model_status=ModelStatus.NOT_READY)
     else:
-        logger.info('Skip training step')
-        logger.info('Load pre-trained weights')
+        print('Skip training step')
+        print('Load pre-trained weights')
         if is_nncf_checkpoint(args.weights):
             task_impl_path = model_template.entrypoints.nncf
         weights = load_weights(args.weights)
@@ -127,12 +124,12 @@ def main(args):
         environment.model = trained_model
 
     task_name = task_impl_path.split('.')[-1]
-    logger.info(f'Create {task_name} Task')
+    print(f'Create {task_name} Task')
     task_cls = get_task_class(task_impl_path)
     task = task_cls(task_environment=environment)
 
     if training_from_scratch:
-        logger.info('Train model')
+        print('Train model')
         task.train(dataset, trained_model)
 
     validation_dataset = dataset.get_subset(Subset.VALIDATION)
@@ -140,7 +137,7 @@ def main(args):
 
     if args.optimize == 'nncf':
         if task_impl_path != model_template.entrypoints.nncf:
-            logger.info('Create NNCF Task')
+            print('Create NNCF Task')
             environment.model = trained_model
             task_impl_path = model_template.entrypoints.nncf
             task_cls = get_task_class(task_impl_path)
@@ -148,7 +145,7 @@ def main(args):
 
             validate(task, validation_dataset, trained_model)
 
-        logger.info('Optimize model')
+        print('Optimize model')
         output_model = ModelEntity(
             dataset,
             environment.get_model_configuration(),
@@ -158,14 +155,14 @@ def main(args):
         validate(task, validation_dataset, output_model)
 
     if args.export:
-        logger.info('Export model')
+        print('Export model')
         exported_model = ModelEntity(
             dataset,
             environment.get_model_configuration(),
             model_status=ModelStatus.NOT_READY)
         task.export(ExportType.OPENVINO, exported_model)
 
-        logger.info('Create OpenVINO Task')
+        print('Create OpenVINO Task')
         environment.model = exported_model
         openvino_task_impl_path = model_template.entrypoints.openvino
         openvino_task_cls = get_task_class(openvino_task_impl_path)
@@ -174,7 +171,7 @@ def main(args):
         validate(openvino_task, validation_dataset, exported_model)
 
         if args.optimize == 'pot':
-            logger.info('Run POT optimization')
+            print('Run POT optimization')
             optimized_model = ModelEntity(
                 dataset,
                 environment.get_model_configuration(),
