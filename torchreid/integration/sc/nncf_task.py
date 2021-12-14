@@ -244,10 +244,12 @@ class OTEClassificationNNCFTask(OTEClassificationInferenceTask, IOptimizationTas
         output_model.precision = self._precision
 
     def save_model(self, output_model: ModelEntity):
-        state_dict = {}
+        state_dict = None
         if self._compression_ctrl is not None:
-            state_dict['compression_state'] = self._compression_ctrl.get_compression_state()
-            state_dict.update(self._nncf_metainfo)
+            state_dict = {
+                'compression_state': self._compression_ctrl.get_compression_state(),
+                'nncf_metainfo': self._nncf_metainfo
+            }
         self._save_model(output_model, state_dict)
 
     def export(self, export_type: ExportType, output_model: ModelEntity):

@@ -91,7 +91,7 @@ def is_nncf_state(state):
     nncf_metainfo = _get_nncf_metainfo_from_state(state)
     if nncf_metainfo is None:
         return False
-    hyperparams = nncf_metainfo('hyperparams', {})
+    hyperparams = nncf_metainfo.get('hyperparams', {})
     return hyperparams.get('enable_quantization', False) or hyperparams.get('enable_pruning', False)
 
 
