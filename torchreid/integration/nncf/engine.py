@@ -37,7 +37,7 @@ def run_acc_aware_training_loop(engine, nncf_config, configure_optimizers_fn):
         return inner
 
     engine.train_data_loader = engine.train_loader
-    engine.max_epoch = nncf_config.get('accuracy_aware_training').get('params').get('maximal_total_epochs', 200)
+    engine.max_epoch = nncf_config['accuracy_aware_training']['params']['maximal_total_epochs']
 
     validate_fn = dec_test(engine.test)
     train_fn = dec_train(engine.train)

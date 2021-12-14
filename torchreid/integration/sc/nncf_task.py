@@ -89,7 +89,12 @@ class OTEClassificationNNCFTask(OTEClassificationInferenceTask, IOptimizationTas
         setattr(self, '__initial_lr', value)
 
     def _set_attributes_by_hyperparams(self):
-        self._max_acc_drop = self._hyperparams.nncf_optimization.maximal_accuracy_degradation
+        logger.info(f'Hyperparameters: ')
+        logger.info(f'maximal_accuracy_degradation = '
+                    f'{self._hyperparams.nncf_optimization.maximal_accuracy_degradation}')
+        logger.info(f'enable_quantization = {self._hyperparams.nncf_optimization.enable_quantization}')
+        logger.info(f'enable_pruning = {self._hyperparams.nncf_optimization.enable_pruning}')
+        self._max_acc_drop = self._hyperparams.nncf_optimization.maximal_accuracy_degradation / 100.0
         quantization = self._hyperparams.nncf_optimization.enable_quantization
         pruning = self._hyperparams.nncf_optimization.enable_pruning
         if quantization and pruning:

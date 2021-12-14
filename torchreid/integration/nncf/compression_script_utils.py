@@ -25,10 +25,9 @@ logger = logging.getLogger(__name__)
 
 
 def get_coeff_decrease_lr_for_nncf(nncf_training_config):
-    if nncf_training_config and nncf_training_config.get('coeff_decrease_lr_for_nncf'):
-        coef = nncf_training_config.get('coeff_decrease_lr_for_nncf')
-        if isinstance(coef, float):
-            return coef
+    coef = nncf_training_config.get('coeff_decrease_lr_for_nncf')
+    if isinstance(coef, float):
+        return coef
     raise RuntimeError('The default value for coeff_decrease_lr_for_nncf is not set')
 
 
@@ -148,6 +147,5 @@ def make_nncf_changes_in_training(model, cfg, classes, command_line_cfg_opts):
 
 
 def make_nncf_changes_in_eval(model, cfg):
-    _, model, _ = \
-            wrap_nncf_model(model, cfg)
+    _, model, _ = wrap_nncf_model(model, cfg)
     return model
