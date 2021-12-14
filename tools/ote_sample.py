@@ -13,7 +13,6 @@
 # and limitations under the License.
 
 import argparse
-import logging
 import os.path as osp
 import sys
 import time
@@ -37,7 +36,6 @@ from torchreid.integration.sc.utils import (ClassificationDatasetAdapter,
 
 def parse_args():
     parser = argparse.ArgumentParser(description='Sample showcasing the new API')
-    parser.add_argument('--mode', choices=['train', 'test'], default='train')
     parser.add_argument('template_file_path', help='path to template file')
     parser.add_argument('--data-dir', default='data')
     parser.add_argument('--weights',
@@ -103,19 +101,27 @@ def main(args):
                                   label_schema=labels_schema,
                                   model_template=model_template)
 
-    training_from_scratch = args.weights is None
-    task_impl_path = model_template.entrypoints.base
+    validation_dataset = dataset.get_subset(Subset.VALIDATION)
 
-    if training_from_scratch:
+    if args.weights is None:
         trained_model = ModelEntity(
             train_dataset=dataset,
             configuration=environment.get_model_configuration(),
             model_status=ModelStatus.NOT_READY)
+
+        print(f'Create base Task')
+        task_impl_path = model_template.entrypoints.base
+        task_cls = get_task_class(task_impl_path)
+        task = task_cls(task_environment=environment)
+
+        print('Train model')
+        task.train(dataset, trained_model)
+
+        validate(task, validation_dataset, trained_model)
     else:
-        print('Skip training step')
         print('Load pre-trained weights')
-        if is_nncf_checkpoint(args.weights):
-            task_impl_path = model_template.entrypoints.nncf
+        task_impl_path = model_template.entrypoints.nncf if is_nncf_checkpoint(args.weights) \
+            else model_template.entrypoints.base
         weights = load_weights(args.weights)
         model_adapters = {'weights.pth': ModelAdapter(weights)}
         if args.aux_weights is not None:
@@ -129,25 +135,20 @@ def main(args):
             model_status = ModelStatus.SUCCESS)
         environment.model = trained_model
 
-    task_name = task_impl_path.split('.')[-1]
-    print(f'Create {task_name} Task')
-    task_cls = get_task_class(task_impl_path)
-    task = task_cls(task_environment=environment)
+        task_name = task_impl_path.split('.')[-1]
+        print(f'Create {task_name} Task')
+        task_cls = get_task_class(task_impl_path)
+        task = task_cls(task_environment=environment)
 
-    if training_from_scratch:
-        print('Train model')
-        task.train(dataset, trained_model)
-
-    validation_dataset = dataset.get_subset(Subset.VALIDATION)
-    validate(task, validation_dataset, trained_model)
+        validate(task, validation_dataset, trained_model)
 
     if args.optimize == 'nncf':
-        if task_impl_path != model_template.entrypoints.nncf:
+        task_impl_path = model_template.entrypoints.nncf
+        nncf_task_cls = get_task_class(task_impl_path)
+        if not isinstance(task, nncf_task_cls):
             print('Create NNCF Task')
             environment.model = trained_model
-            task_impl_path = model_template.entrypoints.nncf
-            task_cls = get_task_class(task_impl_path)
-            task = task_cls(task_environment=environment)
+            task = nncf_task_cls(task_environment=environment)
 
             validate(task, validation_dataset, trained_model)
 
