@@ -1,3 +1,4 @@
+import shutil
 import time
 import os
 import json
@@ -253,8 +254,8 @@ def reload_hyper_parameters(model_template):
     conf_yaml = [dep.source for dep in model_template.dependencies \
                      if dep.destination == model_template.hyper_parameters.base_path][0]
     conf_yaml = osp.join(template_dir, conf_yaml)
-    subprocess.run(f'cp {conf_yaml} {temp_folder}', check=True, shell=True)
-    subprocess.run(f'cp {template_file} {temp_folder}', check=True, shell=True)
+    shutil.copy(conf_yaml, temp_folder)
+    shutil.copy(template_file, temp_folder)
     model_template.hyper_parameters.load_parameters(osp.join(temp_folder, 'template.yaml'))
     assert model_template.hyper_parameters.data
 

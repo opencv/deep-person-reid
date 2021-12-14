@@ -146,14 +146,14 @@ def main():
                 f'python {str(args.path_to_main)}'
                 f' --config {tmp_path_to_cfg}'
                 f' --gpu-num {int(args.gpu_num)}',
-                shell=True
+                shell=False
                 )
         finally:
             os.remove(tmp_path_to_cfg)
     # after training combine all outputs in one file
     if args.dump_results:
         path_to_bash = str(Path.cwd() / 'tools/classification/parse_output.sh')
-        run(f'bash {path_to_bash} {path_to_exp_folder}', shell=True)
+        run(f'bash {path_to_bash} {path_to_exp_folder}', shell=False)
         saver = dict()
         path_to_file = f"{path_to_exp_folder}/combine_all.txt"
         # parse output file from bash script

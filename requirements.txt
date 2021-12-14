@@ -14,8 +14,8 @@ terminaltables
 pytorchcv
 torch-lr-finder==0.2.1
 onnx
-torchvision==0.10.*
-torch==1.10.*
+torchvision==0.9.*
+torch==1.8.*
 optuna
 timm
 addict

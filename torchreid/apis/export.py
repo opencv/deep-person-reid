@@ -84,7 +84,7 @@ def export_ir(onnx_model_path, norm_mean=[0,0,0], norm_std=[1,1,1], input_shape=
     def get_mo_cmd():
         for mo_cmd in ('mo', 'mo.py'):
             try:
-                run(f'{mo_cmd} -h', stdout=DEVNULL, stderr=DEVNULL, shell=True, check=True)
+                run(f'{mo_cmd} -h', stdout=DEVNULL, stderr=DEVNULL, shell=False, check=True)
                 return mo_cmd
             except CalledProcessError:
                 pass

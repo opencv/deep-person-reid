@@ -12,25 +12,25 @@ from ruamel.yaml import YAML
 
 def get_lr_sets(model_name: str):
     if "mobilenet" in model_name:
-        return {"CIFAR100": 0.005, "pets": 0.005, "caltech101": 0.015, 
-                "cars": 0.025, "flowers": 0.02, "DTD": 0.008, "FOOD101": 0.015, 
+        return {"CIFAR100": 0.005, "pets": 0.005, "caltech101": 0.015,
+                "cars": 0.025, "flowers": 0.02, "DTD": 0.008, "FOOD101": 0.015,
                 "birdsnap": 0.015,"FashionMNIST": 0.012, "SUN397": 0.008, "SVHN": 0.015,
                 "attd_mi02_v3": 0.005, "attd_mi04_v4": 0.012, "lgchem": 0.015, "autism": 0.015}
 
     elif 'efficientnet_b0' == model_name:
-        return {"CIFAR100": 0.005, "pets": 0.005, "caltech101": 0.015, 
-                "cars": 0.025, "flowers": 0.02, "DTD": 0.008, "FOOD101": 0.015, 
+        return {"CIFAR100": 0.005, "pets": 0.005, "caltech101": 0.015,
+                "cars": 0.025, "flowers": 0.02, "DTD": 0.008, "FOOD101": 0.015,
                 "birdsnap": 0.015,"FashionMNIST": 0.012, "SUN397": 0.008, "SVHN": 0.015,
                 "attd_mi02_v3": 0.005, "attd_mi04_v4": 0.012, "lgchem": 0.015, "autism": 0.015}
     elif 'efficientnetv2_s' in model_name:
-        return {"CIFAR100": 0.004488, "pets": 0.00597, "caltech101": 0.01355, 
-                "cars": 0.0155, "flowers": 0.010624, "DTD": 0.009936, "FOOD101": 0.0043962, 
+        return {"CIFAR100": 0.004488, "pets": 0.00597, "caltech101": 0.01355,
+                "cars": 0.0155, "flowers": 0.010624, "DTD": 0.009936, "FOOD101": 0.0043962,
                 "birdsnap": 0.004488,"FashionMNIST": 0.0048896, "SUN397": 0.008, "SVHN": 0.015,
                 "attd_mi02_v3": 0.005, "attd_mi04_v4": 0.012, "lgchem": 0.015, "autism": 0.015}
     else:
         print("Unknown model. Use stadart predefined lrs")
-        return {"CIFAR100": 0.003, "pets": 0.003, "caltech101": 0.003, 
-                "cars": 0.003, "flowers": 0.003, "DTD": 0.003, "FOOD101": 0.003, 
+        return {"CIFAR100": 0.003, "pets": 0.003, "caltech101": 0.003,
+                "cars": 0.003, "flowers": 0.003, "DTD": 0.003, "FOOD101": 0.003,
                 "birdsnap": 0.003,"FashionMNIST": 0.003, "SUN397": 0.003, "SVHN": 0.003,
                 "attd_mi02_v3": 0.003, "attd_mi04_v4": 0.003, "lgchem": 0.003, "autism": 0.003}
 
@@ -196,14 +196,14 @@ def main():
                 f'python {str(args.path_to_main)}'
                 f' --config {tmp_path_to_cfg}'
                 f' --gpu-num {int(args.gpu_num)}',
-                shell=True
+                shell=False
                 )
         finally:
             os.remove(tmp_path_to_cfg)
     # after training combine all outputs in one file
     if args.dump_results:
         path_to_bash = str(Path.cwd() / 'tools/classification/parse_output.sh')
-        run(f'bash {path_to_bash} {path_to_exp_folder}', shell=True)
+        run(f'bash {path_to_bash} {path_to_exp_folder}', shell=False)
         saver = dict()
         path_to_file = f"{path_to_exp_folder}/combine_all.txt"
         # parse output file from bash script
