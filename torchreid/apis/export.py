@@ -95,10 +95,10 @@ def export_ir(onnx_model_path, norm_mean=[0,0,0], norm_std=[1,1,1], input_shape=
 
     mo_cmd = get_mo_cmd()
 
-    command_line = [mo_cmd, f'--input_model="{onnx_model_path}"',
-                    f'--mean_values="{mean_values}"',
-                    f'--scale_values="{scale_values}"',
-                    f'--output_dir="{optimized_model_dir}"',
+    command_line = [mo_cmd, f'--input_model={onnx_model_path}',
+                    f'--mean_values={mean_values}',
+                    f'--scale_values={scale_values}',
+                    f'--output_dir={optimized_model_dir}',
                     f'--data_type {data_type}',
                     '--reverse_input_channels']
 
