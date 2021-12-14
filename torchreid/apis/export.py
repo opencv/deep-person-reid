@@ -84,7 +84,7 @@ def export_ir(onnx_model_path, norm_mean=[0,0,0], norm_std=[1,1,1], input_shape=
     def get_mo_cmd():
         for mo_cmd in ('mo', 'mo.py'):
             try:
-                run(f'{mo_cmd} -h', stdout=DEVNULL, stderr=DEVNULL, shell=False, check=True)
+                run([mo_cmd, '-h'], stdout=DEVNULL, stderr=DEVNULL, shell=False, check=True)
                 return mo_cmd
             except CalledProcessError:
                 pass
@@ -95,13 +95,14 @@ def export_ir(onnx_model_path, norm_mean=[0,0,0], norm_std=[1,1,1], input_shape=
 
     mo_cmd = get_mo_cmd()
 
-    command_line = f'{mo_cmd} --input_model="{onnx_model_path}" ' \
-                    f'--mean_values="{mean_values}" ' \
-                    f'--scale_values="{scale_values}" ' \
-                    f'--output_dir="{optimized_model_dir}" ' \
-                    f'--data_type {data_type} ' \
-                    '--reverse_input_channels'
+    command_line = [mo_cmd, f'--input_model="{onnx_model_path}"',
+                    f'--mean_values="{mean_values}"',
+                    f'--scale_values="{scale_values}"',
+                    f'--output_dir="{optimized_model_dir}"',
+                    f'--data_type {data_type}',
+                    '--reverse_input_channels']
+
     if input_shape:
-        command_line += f' --input_shape "{input_shape}" '
+        command_line.append(f' --input_shape "{input_shape}"')
 
     run(command_line, shell=False, check=True)
