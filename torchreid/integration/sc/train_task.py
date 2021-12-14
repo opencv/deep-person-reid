@@ -32,10 +32,9 @@ from scripts.default_config import imagedata_kwargs, lr_scheduler_kwargs, optimi
 from torchreid.apis.training import run_lr_finder, run_training
 from torchreid.integration.sc.inference_task import OTEClassificationInferenceTask
 from torchreid.integration.sc.monitors import DefaultMetricsMonitor
-from torchreid.integration.sc.utils import (OTEClassificationDataset, save_model,
-                                            TrainingProgressCallback)
+from torchreid.integration.sc.utils import (OTEClassificationDataset, TrainingProgressCallback)
 from torchreid.ops import DataParallel
-from torchreid.utils import load_checkpoint, load_pretrained_weights, set_random_seed
+from torchreid.utils import load_pretrained_weights, set_random_seed
 
 logger = logging.getLogger(__name__)
 
@@ -57,12 +56,10 @@ class OTEClassificationTrainingTask(OTEClassificationInferenceTask, ITrainingTas
         self.stop_callback.stop()
 
     def save_model(self, output_model: ModelEntity):
-        aux_model_ckpt_dict = {}
         for name, path in self._aux_model_snap_paths:
-            aux_model_ckpt_dict[name] = load_checkpoint(path, map_location='cpu')
-        state_dict = {'aux_models': aux_model_ckpt_dict}
-
-        save_model(output_model, self._model, self._task_environment, state_dict)
+            with open(path, 'rb') as read_file:
+                output_model.set_data(name, read_file.read())
+        self._save_model(output_model)
 
     def _generate_training_metrics_group(self) -> Optional[List[MetricsGroup]]:
         """
@@ -150,7 +147,7 @@ class OTEClassificationTrainingTask(OTEClassificationInferenceTask, ITrainingTas
             load_pretrained_weights(self._model, best_snap_path)
 
         for filename in os.listdir(self._scratch_space):
-            match = re.match(r'best_(aux_model_[0-9]+)\.pth', filename)
+            match = re.match(r'best_(aux_model_[0-9]+\.pth)', filename)
             if match:
                 aux_model_name = match.group(1)
                 best_aux_snap_path = os.path.join(self._scratch_space, filename)

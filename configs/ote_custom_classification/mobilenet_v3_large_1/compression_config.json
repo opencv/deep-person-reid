@@ -21,8 +21,7 @@
         "nncf_aux_config_changes": [
             {
                 "train": {
-                    "batch_size": 64,
-                    "optim": "sgd"
+                    "batch_size": 64
                 },
                 "test": {
                     "batch_size": 64

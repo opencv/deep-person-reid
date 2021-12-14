@@ -43,6 +43,9 @@ def parse_args():
     parser.add_argument('--weights',
                         help='path to the pre-trained model weights',
                         default=None)
+    parser.add_argument('--aux-weights',
+                        help='path to the pre-trained aux model weights',
+                        default=None)
     parser.add_argument('--optimize', choices=['nncf', 'pot', 'none'], default='pot')
     parser.add_argument('--export', action='store_true')
     parser.add_argument('--debug-dump-folder', default='')
@@ -115,6 +118,9 @@ def main(args):
             task_impl_path = model_template.entrypoints.nncf
         weights = load_weights(args.weights)
         model_adapters = {'weights.pth': ModelAdapter(weights)}
+        if args.aux_weights is not None:
+            aux_weights = load_weights(args.aux_weights)
+            model_adapters['aux_model_1.pth'] = ModelAdapter(aux_weights)
         trained_model = ModelEntity(
             train_dataset=dataset,
             configuration=environment.get_model_configuration(),

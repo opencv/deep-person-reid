@@ -18,12 +18,13 @@ import math
 import os
 import shutil
 import tempfile
-from typing import Dict
-from typing import Optional
+from typing import Dict, Optional
 
 import torch
 
 import torchreid
+from ote_sdk.configuration import cfg_helper
+from ote_sdk.configuration.helper.utils import ids_to_strings
 from ote_sdk.entities.datasets import DatasetEntity
 from ote_sdk.entities.inference_parameters import InferenceParameters
 from ote_sdk.entities.metadata import FloatMetadata, FloatType
@@ -325,3 +326,23 @@ class OTEClassificationInferenceTask(IInferenceTask, IEvaluationTask, IExportTas
             torch.cuda.empty_cache()
             logger.warning(f"Done unloading. "
                            f"Torch is still occupying {torch.cuda.memory_allocated()} bytes of GPU memory")
+
+    def _save_model(self, output_model: ModelEntity, state_dict: Optional[Dict] = None):
+        """
+        Save model
+        """
+        buffer = io.BytesIO()
+        hyperparams = self._task_environment.get_hyper_parameters(OTEClassificationParameters)
+        hyperparams_str = ids_to_strings(cfg_helper.convert(hyperparams, dict, enum_to_str=True))
+        modelinfo = {
+            'model': self._model.state_dict(),
+            'config': hyperparams_str,
+            'VERSION': 1
+        }
+
+        if state_dict is not None:
+            modelinfo.update(state_dict)
+
+        torch.save(modelinfo, buffer)
+        output_model.set_data('weights.pth', buffer.getvalue())
+        output_model.set_data('label_schema.json', label_schema_to_bytes(self._task_environment.label_schema))

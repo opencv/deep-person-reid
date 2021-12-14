@@ -3,6 +3,7 @@ import argparse
 from pprint import pformat
 from torch.onnx.symbolic_helper import parse_args
 import torch
+from yacs.config import CfgNode
 
 import torchreid
 from torchreid.ops import DataParallel
@@ -73,6 +74,8 @@ def build_auxiliary_model(config_file, num_classes, use_gpu,
     merge_from_files_with_base(aux_cfg, config_file)
     if nncf_aux_config_changes:
         print(f'applying to aux config changes from NNCF aux config {nncf_aux_config_changes}')
+        if not isinstance(nncf_aux_config_changes, CfgNode):
+            nncf_aux_config_changes = CfgNode(nncf_aux_config_changes)
         aux_cfg.merge_from_other_cfg(nncf_aux_config_changes)
     if aux_config_opts:
         print(f'applying to aux config changes from command line arguments, '

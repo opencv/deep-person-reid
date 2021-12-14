@@ -98,7 +98,7 @@ def make_nncf_changes_in_config(cfg,
 
 
 def patch_config(cfg, nncf_preset, max_acc_drop=None):
-    #use default config here
+    # TODO: use default config here
     nncf_config = load_nncf_config(cfg.nncf.nncf_config_path)
 
     optimization_config = compose_nncf_config(nncf_config, [nncf_preset])

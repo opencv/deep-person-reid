@@ -26,11 +26,11 @@ from ote_sdk.entities.datasets import DatasetEntity
 from ote_sdk.entities.model import (ModelEntity, ModelFormat, ModelOptimizationType, ModelPrecision,
                                     ModelStatus, OptimizationMethod)
 from ote_sdk.entities.optimization_parameters import OptimizationParameters
+from ote_sdk.entities.subset import Subset
 from ote_sdk.entities.task_environment import TaskEnvironment
 from ote_sdk.entities.train_parameters import default_progress_callback
 from ote_sdk.usecases.tasks.interfaces.export_interface import ExportType
 from ote_sdk.usecases.tasks.interfaces.optimization_interface import IOptimizationTask, OptimizationType
-from sc_sdk.entities.datasets import Subset
 from scripts.default_config import imagedata_kwargs, lr_scheduler_kwargs, optimizer_kwargs
 from torchreid.apis.training import run_training
 from torchreid.integration.nncf.compression import check_nncf_is_enabled, is_nncf_state, wrap_nncf_model
@@ -38,7 +38,7 @@ from torchreid.integration.nncf.compression_script_utils import (calculate_lr_fo
                                                                  patch_config)
 from torchreid.integration.sc.inference_task import OTEClassificationInferenceTask
 from torchreid.integration.sc.monitors import DefaultMetricsMonitor
-from torchreid.integration.sc.utils import OTEClassificationDataset, save_model, TrainingProgressCallback
+from torchreid.integration.sc.utils import OTEClassificationDataset, TrainingProgressCallback
 from torchreid.ops import DataParallel
 from torchreid.utils import set_random_seed
 
@@ -51,7 +51,7 @@ class OTEClassificationNNCFTask(OTEClassificationInferenceTask, IOptimizationTas
         """"
         Task for compressing classification models using NNCF.
         """
-        logger.info("Loading OTEClassificationNNCFTask.")
+        logger.info('Loading OTEClassificationNNCFTask.')
         super().__init__(task_environment)
 
         check_nncf_is_enabled()
@@ -88,14 +88,6 @@ class OTEClassificationNNCFTask(OTEClassificationInferenceTask, IOptimizationTas
     def _initial_lr(self, value):
         setattr(self, '__initial_lr', value)
 
-    @property
-    def _aux_model_ckpt_dicts(self):
-        return getattr(self, '__aux_model_ckpt_dicts', [])
-
-    @_aux_model_ckpt_dicts.setter
-    def _aux_model_ckpt_dicts(self, value):
-        setattr(self, '__aux_model_ckpt_dicts', value)
-
     def _set_attributes_by_hyperparams(self):
         self._max_acc_drop = self._hyperparams.nncf_optimization.maximal_accuracy_degradation
         quantization = self._hyperparams.nncf_optimization.enable_quantization
@@ -125,15 +117,11 @@ class OTEClassificationNNCFTask(OTEClassificationInferenceTask, IOptimizationTas
             logger.info('Skip loading the original model')
             return None
 
-        model_data = pretrained_dict if pretrained_dict else self._load_model_data(model)
+        model_data = pretrained_dict if pretrained_dict else self._load_model_data(model, 'weights.pth')
         if is_nncf_state(model_data):
             raise ValueError(f'Model optimization type is not consistent with the model checkpoint.')
 
         self._initial_lr = model_data.get('initial_lr')
-        aux_models = model_data.get('aux_models', {})
-        for model_name in sorted(aux_models.keys()):
-            self._aux_model_ckpt_dicts.append(aux_models[model_name])
-            logger.info(f'Loaded weights for the aux model: {model_name}')
 
         return super()._load_model(model, device, pretrained_dict=model_data)
 
@@ -141,7 +129,7 @@ class OTEClassificationNNCFTask(OTEClassificationInferenceTask, IOptimizationTas
         if model is None:
             raise ValueError(f'No NNCF trained model in project.')
 
-        model_data = self._load_model_data(model)
+        model_data = self._load_model_data(model, 'weights.pth')
         if not is_nncf_state(model_data):
             raise ValueError(f'Model optimization type is not consistent with the NNCF model checkpoint.')
         model = self._create_model(self._cfg, from_scratch=True)
@@ -149,6 +137,17 @@ class OTEClassificationNNCFTask(OTEClassificationInferenceTask, IOptimizationTas
         compression_ctrl, model, nncf_metainfo = wrap_nncf_model(model, self._cfg, checkpoint_dict=model_data)
         logger.info('Loaded NNCF model weights from Task Environment.')
         return compression_ctrl, model, nncf_metainfo
+
+    def _load_aux_models_data(self, model: ModelEntity):
+        aux_models_data = []
+        num_aux_models = len(self._cfg.mutual_learning.aux_configs)
+        for idx in range(num_aux_models):
+            data_name = f'aux_model_{idx + 1}.pth'
+            if data_name not in model.model_adapters:
+                return []
+            model_data = self._load_model_data(model, data_name)
+            aux_models_data.append(model_data)
+        return aux_models_data
 
     def optimize(
         self,
@@ -167,9 +166,10 @@ class OTEClassificationNNCFTask(OTEClassificationInferenceTask, IOptimizationTas
         if self._cfg.lr_finder.enable:
             raise RuntimeError('LR finder could not be used together with NNCF compression')
 
+        aux_pretrained_dicts = self._load_aux_models_data(self._task_environment.model)
         num_aux_models = len(self._cfg.mutual_learning.aux_configs)
-        num_aux_ckpt_dicts = len(self._aux_model_ckpt_dicts)
-        if not num_aux_ckpt_dicts and num_aux_models != num_aux_ckpt_dicts:
+        num_aux_pretrained_dicts = len(aux_pretrained_dicts)
+        if num_aux_models != num_aux_pretrained_dicts:
             raise RuntimeError('The pretrained weights are not provided for all aux models.')
 
         if optimization_parameters is not None:
@@ -198,8 +198,6 @@ class OTEClassificationNNCFTask(OTEClassificationInferenceTask, IOptimizationTas
 
         self._cfg.train.lr = calculate_lr_for_nncf_training(self._cfg, self._initial_lr, False)
 
-        num_aux_models = len(self._cfg.mutual_learning.aux_configs)
-
         train_model = self._model
         if self._cfg.use_gpu:
             main_device_ids = list(range(self.num_devices))
@@ -218,7 +216,7 @@ class OTEClassificationNNCFTask(OTEClassificationInferenceTask, IOptimizationTas
         run_training(self._cfg, datamanager, train_model, optimizer,
                      scheduler, extra_device_ids, self._cfg.train.lr,
                      should_freeze_aux_models=True,
-                     aux_pretrained_dicts=self._aux_model_ckpt_dicts,
+                     aux_pretrained_dicts=aux_pretrained_dicts,
                      tb_writer=self.metrics_monitor,
                      perf_monitor=time_monitor,
                      stop_callback=self.stop_callback,
@@ -245,7 +243,7 @@ class OTEClassificationNNCFTask(OTEClassificationInferenceTask, IOptimizationTas
         if self._compression_ctrl is not None:
             state_dict['compression_state'] = self._compression_ctrl.get_compression_state()
             state_dict.update(self._nncf_metainfo)
-        save_model(output_model, self._model, self._task_environment, state_dict)
+        self._save_model(output_model, state_dict)
 
     def export(self, export_type: ExportType, output_model: ModelEntity):
         if self._compression_ctrl is None:
@@ -257,6 +255,6 @@ class OTEClassificationNNCFTask(OTEClassificationInferenceTask, IOptimizationTas
             self._model.enable_dynamic_graph_building()
 
     @staticmethod
-    def _load_model_data(model):
-        buffer = io.BytesIO(model.get_data('weights.pth'))
+    def _load_model_data(model, data_name):
+        buffer = io.BytesIO(model.get_data(data_name))
         return torch.load(buffer, map_location=torch.device('cpu'))

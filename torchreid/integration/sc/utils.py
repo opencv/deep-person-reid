@@ -13,21 +13,17 @@
 # and limitations under the License.
 
 import importlib
-import io
 import json
 import os
 import shutil
 import tempfile
 import time
 from os import path as osp
-from typing import Dict, List, Optional
+from typing import List
 
 import cv2 as cv
 import numpy as np
-import torch
 
-from ote_sdk.configuration import cfg_helper
-from ote_sdk.configuration.helper.utils import ids_to_strings
 from ote_sdk.entities.annotation import (Annotation, AnnotationSceneEntity,
                                          AnnotationSceneKind)
 from ote_sdk.entities.dataset_item import DatasetItemEntity
@@ -37,15 +33,11 @@ from ote_sdk.entities.image import Image
 from ote_sdk.entities.label import Domain, LabelEntity
 from ote_sdk.entities.label_schema import (LabelGroup, LabelGroupType,
                                            LabelSchemaEntity)
-from ote_sdk.entities.model import ModelEntity
 from ote_sdk.entities.scored_label import ScoredLabel
 from ote_sdk.entities.shapes.rectangle import Rectangle
 from ote_sdk.entities.subset import Subset
-from ote_sdk.entities.task_environment import TaskEnvironment
 from ote_sdk.entities.train_parameters import UpdateProgressCallback
-from ote_sdk.serialization.label_mapper import label_schema_to_bytes
 from ote_sdk.usecases.reporting.time_monitor_callback import TimeMonitorCallback
-from torchreid.integration.sc.parameters import OTEClassificationParameters
 
 
 class ClassificationDatasetAdapter(DatasetEntity):
@@ -377,23 +369,3 @@ def get_multilabel_predictions(logits: np.ndarray, labels: List[LabelEntity],
             item_labels.append(label)
 
     return item_labels
-
-
-def save_model(output_model: ModelEntity,
-               model: torch.nn.Module,
-               task_environment: TaskEnvironment,
-               state_dict: Optional[Dict] = None):
-    buffer = io.BytesIO()
-    hyperparams = task_environment.get_hyper_parameters(OTEClassificationParameters)
-    hyperparams_str = ids_to_strings(cfg_helper.convert(hyperparams, dict, enum_to_str=True))
-    modelinfo = {
-        'model': model.state_dict(),
-        'config': hyperparams_str,
-        'VERSION': 1
-    }
-    if state_dict is not None:
-        modelinfo.update(state_dict)
-
-    torch.save(modelinfo, buffer)
-    output_model.set_data("weights.pth", buffer.getvalue())
-    output_model.set_data("label_schema.json", label_schema_to_bytes(task_environment.label_schema))
