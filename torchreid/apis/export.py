@@ -104,4 +104,4 @@ def export_ir(onnx_model_path, norm_mean=[0,0,0], norm_std=[1,1,1], input_shape=
     if input_shape:
         command_line += f' --input_shape "{input_shape}" '
 
-    run(command_line, shell=True, check=True)
+    run(command_line, shell=False, check=True)

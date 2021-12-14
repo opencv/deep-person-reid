@@ -2,7 +2,7 @@ from __future__ import absolute_import, division, print_function
 import os.path as osp
 from os import listdir
 
-from lxml import etree
+from defusedxml import lxml as etree
 
 from ..dataset import ImageDataset
 

@@ -174,9 +174,10 @@ def _build_optim(model,
             param_groups.append({'params': list(compression_params), 'lr': lr, 'weight_decay': 0.0})
     else:
         for param_group in get_model_attr(model, 'get_config_optim')(lr):
+            group_weight_decay = param_group['weight_decay'] if 'weight_decay' in param_group else weight_decay
             param_groups.append({'params': [param for _, param in param_group['params']],
                                  'lr': param_group['lr'],
-                                 'weight_decay': param_group['weight_decay']})
+                                 'weight_decay': group_weight_decay})
 
     if optim == 'adam':
         optimizer = torch.optim.AdamW(
