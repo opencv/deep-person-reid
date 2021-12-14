@@ -20,6 +20,8 @@ from pprint import pformat
 import logging
 import torch
 
+from torchreid.metrics import evaluate_multilabel_classification
+from torchreid.utils import get_model_attr
 from torchreid.utils.tools import random_image
 
 logger = logging.getLogger(__name__)
@@ -241,18 +243,35 @@ def wrap_nncf_model(model, cfg,
         from torchreid.metrics.classification import evaluate_classification
 
         if test_loader is None:
-            raise RuntimeError('Cannot perform model evaluation on the validation '
+            raise RuntimeError('Cannot perform a model evaluation on the validation '
                                'dataset since the validation data loader was not passed '
                                'to wrap_nncf_model')
 
+        model_type = get_model_attr(model, 'type')
         targets = list(test_loader.keys())
         use_gpu = True if 'cuda' == cur_device.type else False
         for dataset_name in targets:
             domain = 'source' if dataset_name in datamanager_for_init.sources else 'target'
             print('##### Evaluating {} ({}) #####'.format(dataset_name, domain))
-            cmc, m_ap, norm_cm = evaluate_classification(test_loader[dataset_name]['query'], model,
-                                                         use_gpu=use_gpu)
-        return cmc[0]
+            if model_type == 'classification':
+                cmc, _, _ = evaluate_classification(
+                    test_loader[dataset_name]['query'],
+                    model,
+                    use_gpu=use_gpu
+                )
+                accuracy = cmc[0]
+            elif model_type == 'multilabel':
+                mAP, _, _, _, _, _, _ = evaluate_multilabel_classification(
+                    test_loader[dataset_name]['query'],
+                    model,
+                    use_gpu=use_gpu
+                )
+                accuracy = mAP
+            else:
+                raise ValueError(f'Cannot perform a model evaluation on the validation dataset'
+                                 f'since the model has unsupported model_type {model_type or "None"}')
+
+        return accuracy
 
     cur_device = next(model.parameters()).device
     logger.info(f'NNCF: cur_device = {cur_device}')

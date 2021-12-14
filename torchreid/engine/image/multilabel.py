@@ -18,7 +18,7 @@ class MultilabelEngine(Engine):
     def __init__(self, datamanager, models, optimizers, schedulers, use_gpu, save_all_chkpts,
                  train_patience, early_stoping, lr_decay_factor, loss_name, label_smooth,
                  lr_finder, m, amb_k, amb_t, clip_grad,
-                 should_freeze_aux_models, nncf_metainfo, initial_lr,
+                 should_freeze_aux_models, nncf_metainfo, compression_ctrl, initial_lr,
                  target_metric, use_ema_decay, ema_decay, asl_gamma_pos, asl_gamma_neg, asl_p_m,
                  mix_precision, **kwargs):
 
@@ -33,6 +33,7 @@ class MultilabelEngine(Engine):
                         early_stoping=early_stoping,
                         should_freeze_aux_models=should_freeze_aux_models,
                         nncf_metainfo=nncf_metainfo,
+                        compression_ctrl=compression_ctrl,
                         initial_lr=initial_lr,
                         lr_finder=lr_finder,
                         target_metric=target_metric,
@@ -138,6 +139,10 @@ class MultilabelEngine(Engine):
                 coeff_mutual_learning = int(not should_turn_off_mutual_learning)
 
                 total_loss += coeff_mutual_learning * mutual_loss
+                if self.compression_ctrl:
+                    compression_loss = self.compression_ctrl.loss()
+                    loss_summary['compression_loss'] = compression_loss
+                    total_loss += compression_loss
 
             # backward pass
             self.scaler.scale(total_loss).backward(retain_graph=False)

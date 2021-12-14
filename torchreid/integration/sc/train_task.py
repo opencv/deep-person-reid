@@ -56,7 +56,7 @@ class OTEClassificationTrainingTask(OTEClassificationInferenceTask, ITrainingTas
         self.stop_callback.stop()
 
     def save_model(self, output_model: ModelEntity):
-        for name, path in self._aux_model_snap_paths:
+        for name, path in self._aux_model_snap_paths.items():
             with open(path, 'rb') as read_file:
                 output_model.set_data(name, read_file.read())
         self._save_model(output_model)
