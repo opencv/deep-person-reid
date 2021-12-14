@@ -103,6 +103,6 @@ def export_ir(onnx_model_path, norm_mean=[0,0,0], norm_std=[1,1,1], input_shape=
                     '--reverse_input_channels']
 
     if input_shape:
-        command_line.append('--input_shape', f"{input_shape}")
+        command_line.extend(['--input_shape', f"{input_shape}"])
 
     run(command_line, shell=False, check=True)
