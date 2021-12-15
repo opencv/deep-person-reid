@@ -1,8 +1,6 @@
 inplace_abn
 pytest
 pylint==2.11.1
-defusedxml
-lxml
 flake8
 yapf
 isort
