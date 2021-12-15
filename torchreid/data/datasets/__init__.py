@@ -3,13 +3,13 @@ from copy import copy
 
 from .dataset import Dataset, ImageDataset
 from .image import (CUHK01, CUHK02, CUHK03, GRID, LFW, MSMT17, PRID, VRIC,
-                    CityFlow, Classification, ClassificationImageFolder, ExternalDatasetWrapper,
+                    Classification, ClassificationImageFolder, ExternalDatasetWrapper,
                     MultiLabelClassification, CompCars, DukeMTMCreID, InternalAirport,
                     InternalCameraTampering, InternalGlobalMe, InternalMall,
                     InternalPSVIndoor, InternalPSVOutdoor, InternalSSPlatform,
                     InternalSSStreet, InternalSSTicket, InternalWildtrack,
                     Market1501, MarketTrainOnly, SenseReID, UniverseModels,
-                    Vehicle1M, VeRi, VeRiWild, VGGFace2, VIPeR, VMMRdb, iLIDS)
+                    Vehicle1M, VeRiWild, VGGFace2, VIPeR, VMMRdb, iLIDS)
 
 __image_datasets = {
     'market1501': Market1501,
@@ -24,10 +24,8 @@ __image_datasets = {
     'prid': PRID,
     'cuhk02': CUHK02,
     'vric': VRIC,
-    'veri': VeRi,
     'compcars': CompCars,
     'vmmrdb': VMMRdb,
-    'cityflow': CityFlow,
     'vehicle1m': Vehicle1M,
     'universemodels': UniverseModels,
     'veriwild': VeRiWild,

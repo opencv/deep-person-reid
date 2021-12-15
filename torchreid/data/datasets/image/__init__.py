@@ -20,7 +20,6 @@ from .prid import PRID
 from .sensereid import SenseReID
 from .universe_models import UniverseModels
 from .vehicle1m import Vehicle1M
-from .veri import VeRi
 from .veriwild import VeRiWild
 from .vgg_face2 import VGGFace2
 from .viper import VIPeR
