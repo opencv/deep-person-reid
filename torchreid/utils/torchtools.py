@@ -157,6 +157,7 @@ def load_checkpoint(fpath, map_location=''):
     try:
         checkpoint = torch.load(fpath, map_location=map_location)
     except UnicodeDecodeError:
+        raise RuntimeError('Using pickle reloader could cause vulnerability, so it is blocked')
         pickle.load = partial(pickle.load, encoding="latin1")
         pickle.Unpickler = partial(pickle.Unpickler, encoding="latin1")
         checkpoint = torch.load(
