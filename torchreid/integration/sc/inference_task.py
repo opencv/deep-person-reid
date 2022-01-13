@@ -177,7 +177,7 @@ class OTEClassificationInferenceTask(IInferenceTask, IEvaluationTask, IExportTas
         self._cfg.test.batch_size = max(1, self._hyperparams.learning_parameters.batch_size // 2)
         self._cfg.train.max_epoch = self._hyperparams.learning_parameters.max_num_epochs
         self._cfg.lr_finder.enable = self._hyperparams.learning_parameters.enable_lr_finder
-        self._cfg.early_stopping = self._hyperparams.learning_parameters.enable_early_stopping
+        self._cfg.train.early_stopping = self._hyperparams.learning_parameters.enable_early_stopping
 
     def infer(self, dataset: DatasetEntity,
               inference_parameters: Optional[InferenceParameters] = None) -> DatasetEntity:
