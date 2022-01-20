@@ -73,7 +73,7 @@ train:
   lr_scheduler: 'warmup'
   warmup: 5
   base_scheduler: 'reduce_on_plateau'
-  early_stoping: True
+  early_stopping: True
   train_patience: 5
   lr_decay_factor: 200
   deterministic: True
@@ -85,7 +85,7 @@ train:
     enable: True
     ema_decay: 0.999
   mix_precision: True
-  
+
 test:
   batch_size: 128
   evaluate: False

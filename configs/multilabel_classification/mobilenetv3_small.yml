@@ -65,7 +65,7 @@ train:
   weight_decay: 5e-4
   batch_size: 64
   lr_scheduler: 'onecycle'
-  early_stoping: True
+  early_stopping: True
   pct_start: 0.2
   train_patience: 5
   lr_decay_factor: 1000
