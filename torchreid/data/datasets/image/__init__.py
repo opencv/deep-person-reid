@@ -7,4 +7,6 @@
 
 from __future__ import absolute_import, print_function
 
-from .classification import Classification, ClassificationImageFolder, ExternalDatasetWrapper, MultiLabelClassification
+from .classification import (Classification, ClassificationImageFolder,
+                             ExternalDatasetWrapper, MultiLabelClassification,
+                             MultiheadClassification)

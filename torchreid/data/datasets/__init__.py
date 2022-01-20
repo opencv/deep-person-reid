@@ -9,13 +9,14 @@ from __future__ import absolute_import, print_function
 from copy import copy
 
 from .image import (Classification, ClassificationImageFolder, ExternalDatasetWrapper,
-                    MultiLabelClassification)
+                    MultiLabelClassification, MultiheadClassification)
 
 __image_datasets = {
     'classification': Classification,
     'classification_image_folder' : ClassificationImageFolder,
     'external_classification_wrapper' : ExternalDatasetWrapper,
     'multilabel_classification': MultiLabelClassification,
+    'multihead_classification': MultiheadClassification,
 }
 
 

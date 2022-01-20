@@ -258,3 +258,84 @@ class MultiLabelClassification(ImageDataset):
         if img_wo_objects:
             print(f'WARNING: there are {img_wo_objects} images without labels and will be treated as negatives')
         return out_data, class_to_idx
+
+
+class MultiheadClassification(ImageDataset):
+    """Mixed multilabel/multiclass classification dataset.
+    """
+
+    def __init__(self, root='', mode='train', dataset_id=0, load_masks=False, **kwargs):
+        if load_masks:
+            raise NotImplementedError
+
+        self.root = osp.abspath(osp.expanduser(root))
+        self.data_dir = osp.dirname(self.root)
+        self.annot = self.root
+
+        required_files = [
+            self.data_dir, self.annot
+        ]
+        self.check_before_run(required_files)
+        if mode == 'train':
+            train, mixed_cls_heads_info = self.load_annotation(
+                self.annot,
+                self.data_dir,
+            )
+            test = []
+        elif mode == 'test':
+            test, mixed_cls_heads_info = self.load_annotation(
+                self.annot,
+                self.data_dir,
+            )
+            train = []
+        else:
+            mixed_cls_heads_info = []
+            train, test = [], []
+
+        super().__init__(train, test, mode=mode, **kwargs)
+        self.classes = mixed_cls_heads_info['class_to_global_idx']
+        self.mixed_cls_heads_info = mixed_cls_heads_info
+
+    @staticmethod
+    def load_annotation(annot_path, data_dir, dataset_id=0):
+        out_data = []
+        with open(annot_path) as f:
+            annotation = json.load(f)
+            groups = annotation['label_groups']
+            list_cmp = lambda x,y: x[0] < y[0]
+            single_label_groups = sorted([g for g in groups if len(g) == 1], cmp=list_cmp)
+            exclusive_groups = sorted([sorted(g) for g in groups if len(g) > 1], cmp=list_cmp)
+
+            all_classes = [c for c in (exclusive_groups + single_label_groups)]
+            class_to_global_idx = {all_classes[i]: i for i in range(len(all_classes))}
+            class_to_idx = {}
+            for i, g in enumerate(exclusive_groups):
+                for j, c in enumerate(g):
+                    class_to_idx[c] = (i, j) # group idx and idx inside group
+
+            # other labels are in multilabel group
+            for j, g in enumerate(single_label_groups):
+                class_to_idx[g[0]] = (len(exclusive_groups), j)
+
+            mixed_cls_heads_info = {
+                                    'num_multiclass_heads': len(exclusive_groups),
+                                    'num_multilabel_classes': len(single_label_groups),
+                                    'class_to_global_idx': class_to_global_idx,
+                                    'class_to_group_idx': class_to_idx
+                                   }
+
+            images_info = annotation['images']
+            img_wo_objects = 0
+            for img_info in images_info:
+                rel_image_path, img_labels = img_info
+                full_image_path = osp.join(data_dir, rel_image_path)
+
+                labels_idx = [class_to_idx[lbl] for lbl in img_labels if lbl in class_to_idx]
+
+                assert full_image_path
+                if not labels_idx:
+                    img_wo_objects += 1
+                out_data.append((full_image_path, tuple(labels_idx)))
+        if img_wo_objects:
+            print(f'WARNING: there are {img_wo_objects} images without labels and will be treated as negatives')
+        return out_data, mixed_cls_heads_info

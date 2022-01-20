@@ -62,10 +62,22 @@ class ImageDataset:
         image = read_image(input_record[0], grayscale=False)
         obj_id = input_record[1]
 
+        dataset_id = input_record[3]
         if isinstance(obj_id, (tuple, list)): # when multi-label classification is available
-            targets = torch.zeros(self.num_train_ids)
-            for obj in obj_id:
-                targets[obj] = 1
+            if isinstance(obj_id[0], (tuple, list)):
+                num_cls_heads = self.mixed_cls_heads_info['num_multiclass_heads']
+                targets = torch.zeros(self.mixed_cls_heads_info['num_multiclass_heads'] + \
+                                        self.mixed_cls_heads_info['num_multilabel_classes'])
+                targets[0 : num_cls_heads] = -1.
+                for group_idx, in_group_idx in obj_id:
+                    if group_idx < num_cls_heads:
+                        targets[group_idx] = in_group_idx
+                    else:
+                        targets[num_cls_heads + in_group_idx] = 1.
+            else:
+                targets = torch.zeros(self.num_train_pids[dataset_id])
+                for obj in obj_id:
+                    targets[obj] = 1
             obj_id = targets
 
         if self.transform is not None:
