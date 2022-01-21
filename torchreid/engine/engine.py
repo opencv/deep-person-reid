@@ -628,7 +628,7 @@ class Engine:
                         lr_finder = lr_finder
                     )
             elif model_type == 'multihead':
-                cur_top1 = self._evaluate_multilabel_classification(
+                cur_top1 = self._evaluate_multihead_classification(
                     model=model,
                     epoch=epoch,
                     data_loader=self.test_loader,
@@ -636,7 +636,7 @@ class Engine:
                     lr_finder=lr_finder
                 )
                 if ema_condition:
-                    ema_top1 = self._evaluate_multilabel_classification(
+                    ema_top1 = self._evaluate_multihead_classification(
                         model=self.ema_model.module,
                         epoch=epoch,
                         data_loader=self.test_loader,

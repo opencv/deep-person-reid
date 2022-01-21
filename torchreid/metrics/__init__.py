@@ -8,4 +8,5 @@
 from __future__ import absolute_import
 
 from .accuracy import accuracy, accuracy_multilabel
-from .classification import evaluate_classification, show_confusion_matrix, evaluate_multilabel_classification
+from .classification import (evaluate_classification, show_confusion_matrix, evaluate_multilabel_classification,
+                             evaluate_multihead_classification)
