@@ -6,6 +6,7 @@ from __future__ import absolute_import, division, print_function
 import os
 import os.path as osp
 import json
+from operator import itemgetter
 
 import torch
 
@@ -295,18 +296,23 @@ class MultiheadClassification(ImageDataset):
         super().__init__(train, test, mode=mode, **kwargs)
         self.classes = mixed_cls_heads_info['class_to_global_idx']
         self.mixed_cls_heads_info = mixed_cls_heads_info
+        self.num_train_ids = mixed_cls_heads_info['num_multiclass_heads'] + mixed_cls_heads_info['num_multilabel_classes']
 
     @staticmethod
-    def load_annotation(annot_path, data_dir, dataset_id=0):
+    def load_annotation(annot_path, data_dir):
         out_data = []
         with open(annot_path) as f:
             annotation = json.load(f)
             groups = annotation['label_groups']
-            list_cmp = lambda x,y: x[0] < y[0]
-            single_label_groups = sorted([g for g in groups if len(g) == 1], cmp=list_cmp)
-            exclusive_groups = sorted([sorted(g) for g in groups if len(g) > 1], cmp=list_cmp)
+            single_label_groups = [g for g in groups if len(g) == 1]
+            exclusive_groups = [sorted(g) for g in groups if len(g) > 1]
+            single_label_groups.sort(key=itemgetter(0))
+            exclusive_groups.sort(key=itemgetter(0))
 
-            all_classes = [c for c in (exclusive_groups + single_label_groups)]
+            all_classes = []
+            for g in (exclusive_groups + single_label_groups):
+                for c in g:
+                    all_classes.append(c)
             class_to_global_idx = {all_classes[i]: i for i in range(len(all_classes))}
             class_to_idx = {}
             for i, g in enumerate(exclusive_groups):

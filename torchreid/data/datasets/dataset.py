@@ -62,9 +62,9 @@ class ImageDataset:
         image = read_image(input_record[0], grayscale=False)
         obj_id = input_record[1]
 
-        dataset_id = input_record[3]
+        dataset_id = 0#input_record[3]
         if isinstance(obj_id, (tuple, list)): # when multi-label classification is available
-            if isinstance(obj_id[0], (tuple, list)):
+            if len(obj_id) and isinstance(obj_id[0], (tuple, list)):
                 num_cls_heads = self.mixed_cls_heads_info['num_multiclass_heads']
                 targets = torch.zeros(self.mixed_cls_heads_info['num_multiclass_heads'] + \
                                         self.mixed_cls_heads_info['num_multilabel_classes'])
@@ -114,7 +114,10 @@ class ImageDataset:
         for record in data:
             label = record[1]
             if isinstance(label, (list, tuple)):
-                ids.update(set(label))
+                if len(label) and isinstance(label[0], (tuple, list)):
+                    ids.update([1])
+                else:
+                    ids.update(set(label))
             else:
                 ids.add(label)
 

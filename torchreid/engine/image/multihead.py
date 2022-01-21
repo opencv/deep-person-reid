@@ -78,7 +78,7 @@ class MultiheadEngine(Engine):
         self.ml_losses = list()
         self.loss_kl = nn.KLDivLoss(reduction='batchmean')
 
-        self.mixed_cls_heads_info = self.datamanager.train.mixed_cls_heads_info
+        self.mixed_cls_heads_info = self.datamanager.train_dataset.mixed_cls_heads_info
         self.multiclass_losses = nn.ModuleList()
         self.multilabel_loss = None
 
@@ -209,26 +209,33 @@ class MultiheadEngine(Engine):
             if trg_num_samples == 0:
                 raise RuntimeError("There is no samples in a batch!")
 
+            scale = 1.
             loss = 0.
             for i, mcls_loss in enumerate(self.multiclass_losses):
                 head_gt = targets[:,i]
                 head_logits = all_logits[:,i]
                 valid_mask = head_gt >= 0
-                loss += mcls_loss(head_logits[valid_mask], head_gt[valid_mask], scale=self.scales[model_name])
-                acc += metrics.accuracy(head_logits[valid_mask], head_gt[valid_mask])[0].item()
+                head_gt = head_gt[valid_mask].view(*valid_mask.shape)
+                head_logits = head_logits[valid_mask].view(*valid_mask.shape)
+                loss += mcls_loss(head_logits, head_gt, scale=self.scales[model_name])
+                acc += metrics.accuracy(head_logits, head_gt)[0].item()
+                scale = mcls_loss.get_scale()
 
             if self.multilabel_loss:
-                head_gt = targets[:,self.mixed_cls_heads_info['num_multilabel_classes']:]
-                head_logits = all_logits[:,self.mixed_cls_heads_info['num_multilabel_classes']:]
-                valid_mask = head_gt >= 0
-                loss += self.main_losses(head_logits[valid_mask], head_gt[valid_mask], scale=self.scales[model_name])
-                acc += metrics.accuracy_multilabel(head_logits[valid_mask], head_gt[valid_mask]).item()
+                head_gt = targets[:,self.mixed_cls_heads_info['num_multiclass_heads']:]
+                head_logits = all_logits[:,self.mixed_cls_heads_info['num_multiclass_heads']:]
+                valid_mask = head_gt >= 0.
+                head_gt = head_gt[valid_mask].view(*valid_mask.shape)
+                head_logits = head_logits[valid_mask].view(*valid_mask.shape)
+                loss += self.multilabel_loss(head_logits, head_gt, scale=self.scales[model_name])
+                acc += metrics.accuracy_multilabel(head_logits, head_gt).item()
+                scale = self.multilabel_loss.get_scale()
 
             acc /= len(self.multiclass_losses) + int(self.multilabel_loss != None)
 
             loss_summary[f'main_{model_name}'] = loss.item()
 
-            scaled_logits = self.main_loss.get_scale() * all_logits
+            scaled_logits = scale * all_logits
 
             return loss, loss_summary, acc, scaled_logits
 
