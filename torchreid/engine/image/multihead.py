@@ -1,6 +1,3 @@
-# Copyright (c) 2018-2021 Kaiyang Zhou
-# SPDX-License-Identifier: MIT
-#
 # Copyright (C) 2020-2021 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 #
@@ -9,26 +6,28 @@ from __future__ import absolute_import, division, print_function
 
 import numpy as np
 import torch
-from torch import nn
+import torch.nn as nn
 import torch.nn.functional as F
 from torch.cuda.amp import GradScaler, autocast
 
 from torchreid import metrics
-from torchreid.engine.engine import Engine
-from torchreid.utils import sample_mask
-from torchreid.losses import (AMSoftmaxLoss, CrossEntropyLoss)
+from torchreid.engine import Engine
+from torchreid.losses import AMSoftmaxLoss, CrossEntropyLoss
+from torchreid.losses import AsymmetricLoss, AMBinaryLoss
 from torchreid.optim import SAM
 
 
-class ImageAMSoftmaxEngine(Engine):
+class MultiheadEngine(Engine):
     r"""AM-Softmax-loss engine for image-reid.
     """
     def __init__(self, datamanager, models, optimizers, schedulers, use_gpu, save_all_chkpts,
                  train_patience, early_stopping, lr_decay_factor, loss_name, label_smooth,
                  margin_type, aug_type, decay_power, alpha, size, lr_finder, aug_prob,
-                 conf_penalty, pr_product, m, clip_grad, symmetric_ce, enable_rsc,
+                 conf_penalty, pr_product, m, amb_k, amb_t, clip_grad, symmetric_ce, enable_rsc,
                  should_freeze_aux_models, nncf_metainfo, compression_ctrl, initial_lr,
-                 target_metric, use_ema_decay, ema_decay, mix_precision, **kwargs):
+                 target_metric, use_ema_decay, ema_decay,  asl_gamma_pos, asl_gamma_neg, asl_p_m,
+                 mix_precision, **kwargs):
+
         super().__init__(datamanager,
                          models=models,
                          optimizers=optimizers,
@@ -47,8 +46,15 @@ class ImageAMSoftmaxEngine(Engine):
                          use_ema_decay=use_ema_decay,
                          ema_decay=ema_decay)
 
-        assert loss_name in ['softmax', 'am_softmax']
-        if loss_name == 'am_softmax':
+        loss_names = loss_name.split(',')
+        assert len(loss_names) == 2
+        if loss_names[0] in ['softmax', 'am_softmax']:
+            sm_loss_name, multilabel_loss_name = loss_names[0], loss_names[1]
+        else:
+            sm_loss_name, multilabel_loss_name = loss_names[1], loss_names[0]
+        assert sm_loss_name in ['softmax', 'am_softmax']
+        assert multilabel_loss_name in ['am_binary', 'bce', 'asl']
+        if sm_loss_name == 'am_softmax' or loss_name == 'am_binary':
             assert m >= 0.0
 
         self.clip_grad = clip_grad
@@ -69,73 +75,89 @@ class ImageAMSoftmaxEngine(Engine):
         self.scaler = GradScaler(enabled=mix_precision)
 
         self.num_classes = self.datamanager.num_train_ids
+        self.ml_losses = list()
         self.loss_kl = nn.KLDivLoss(reduction='batchmean')
-        if loss_name == 'softmax':
-            self.main_loss = CrossEntropyLoss(
-                use_gpu=self.use_gpu,
-                label_smooth=label_smooth,
-                augmentations=self.aug_type,
-                conf_penalty=conf_penalty,
-                scale=self.am_scale
-            )
-        elif loss_name == 'am_softmax':
-            self.main_loss = AMSoftmaxLoss(
-                use_gpu=self.use_gpu,
-                label_smooth=label_smooth,
-                margin_type=margin_type,
-                aug_type=aug_type,
-                conf_penalty=conf_penalty,
-                m=m,
-                s=self.am_scale,
-                pr_product=pr_product,
-                symmetric_ce=symmetric_ce,
-            )
 
+        self.mixed_cls_heads_info = self.datamanager.train.mixed_cls_heads_info
+        self.multiclass_losses = nn.ModuleList()
+        self.multilabel_loss = None
+
+        for _ in range(self.mixed_cls_heads_info['num_multiclass_heads']):
+            if sm_loss_name == 'softmax':
+                self.multiclass_losses.append(CrossEntropyLoss(
+                    use_gpu=self.use_gpu,
+                    label_smooth=label_smooth,
+                    augmentations=self.aug_type,
+                    conf_penalty=conf_penalty,
+                    scale=self.am_scale
+                ))
+            elif sm_loss_name == 'am_softmax':
+                self.multiclass_losses.append(AMSoftmaxLoss(
+                    use_gpu=self.use_gpu,
+                    label_smooth=label_smooth,
+                    margin_type=margin_type,
+                    aug_type=aug_type,
+                    conf_penalty=conf_penalty,
+                    m=m,
+                    s=self.am_scale,
+                    pr_product=pr_product,
+                    symmetric_ce=symmetric_ce,
+                ))
+
+        if self.mixed_cls_heads_info['num_multilabel_classes'] > 0:
+            if multilabel_loss_name == 'asl':
+                self.multilabel_loss = AsymmetricLoss(
+                    gamma_neg=asl_gamma_neg,
+                    gamma_pos=asl_gamma_pos,
+                    probability_margin=asl_p_m,
+                    label_smooth=label_smooth,
+                )
+            elif multilabel_loss_name == 'bce':
+                self.multilabel_loss = AsymmetricLoss(
+                    gamma_neg=0,
+                    gamma_pos=0,
+                    probability_margin=0,
+                    label_smooth=label_smooth,
+                )
+            elif multilabel_loss_name == 'am_binary':
+                self.multilabel_loss = AMBinaryLoss(
+                    m=m,
+                    k=amb_k,
+                    t=amb_t,
+                    s=self.am_scale,
+                    gamma_neg=asl_gamma_neg,
+                    gamma_pos=asl_gamma_pos,
+                    label_smooth=label_smooth,
+                )
 
     @staticmethod
     def _valid(value):
         return value is not None and value > 0
 
     def forward_backward(self, data):
+        n_iter = self.epoch * self.num_batches + self.batch_idx
         imgs, targets = self.parse_data_for_train(data, self.use_gpu)
 
-        imgs = self._apply_batch_augmentation(imgs)
         model_names = self.get_model_names()
         num_models = len(model_names)
+        assert num_models == 1 # mutual learning is not supported in case of multihead training
 
         steps = [1, 2] if self.enable_sam and not self.lr_finder else [1]
         for step in steps:
             # if sam is enabled then statistics will be written each step, but will be saved only the second time
             # this is made just for convenience
-            loss_summary = {}
-            all_models_logits = []
+            loss_summary = dict()
 
             for i, model_name in enumerate(model_names):
-                unscaled_model_logits = self._forward_model(self.models[model_name], imgs, targets)
-                all_models_logits.append(unscaled_model_logits)
-
-            for i, model_name in enumerate(model_names):
-                if not self.models[model_name].training:
-                    continue
-                self.optims[model_name].zero_grad()
-                loss, model_loss_summary, acc = self._single_model_losses(
-                    all_models_logits[i], targets, model_name
+                loss, model_loss_summary, acc, scaled_logits = self._single_model_losses(
+                    self.models[model_name], imgs, targets, n_iter, model_name
                     )
                 loss_summary.update(model_loss_summary)
-                all_models_logits[i] = all_models_logits[i] * self.scales[model_name]
                 if i == 0: # main model
                     main_acc = acc
-                mutual_learning = num_models > 1 and not self._should_turn_off_mutual_learning(self.epoch)
-                if mutual_learning: # mutual learning
-                    mutual_loss = 0
-                    for j in range(num_models):
-                        if i != j:
-                            with torch.no_grad():
-                                aux_out_distrib = F.softmax(all_models_logits[j], dim=1)
-                            mutual_loss += self.loss_kl(F.log_softmax(all_models_logits[i], dim = 1),
-                                                        aux_out_distrib)
-                    loss_summary[f'mutual_{model_names[i]}'] = mutual_loss.item()
-                    loss += mutual_loss / (num_models - 1)
+
+            for i, model_name in enumerate(model_names):
+                self.optims[model_name].zero_grad()
 
                 if self.compression_ctrl:
                     compression_loss = self.compression_ctrl.loss()
@@ -144,6 +166,8 @@ class ImageAMSoftmaxEngine(Engine):
 
                 # backward pass
                 self.scaler.scale(loss).backward()
+                if not self.models[model_name].training:
+                    continue
 
                 if self.clip_grad != 0 and step == 1:
                     self.scaler.unscale_(self.optims[model_name])
@@ -161,6 +185,7 @@ class ImageAMSoftmaxEngine(Engine):
                     self.scaler.update() # update scaler after first step
                     if overflow:
                         print("Overflow occurred. Skipping step ...")
+                        loss_summary['loss'] = loss.item()
                         # skip second step  if overflow occurred
                         return loss_summary, main_acc
                 else:
@@ -170,108 +195,42 @@ class ImageAMSoftmaxEngine(Engine):
                     self.optims[model_name].second_step()
                     self.scaler.update()
 
-        # record losses
-        if mutual_learning:
-            loss_summary[f'mutual_{model_names[i]}'] = mutual_loss.item()
-        if self.compression_ctrl:
-            loss_summary['compression_loss'] = compression_loss
-        loss_summary['loss'] = loss.item()
+            loss_summary['loss'] = loss.item()
 
         return loss_summary, main_acc
 
-    def _forward_model(self, model, imgs, targets,):
+    def _single_model_losses(self, model, imgs, targets, n_iter, model_name):
         with autocast(enabled=self.mix_precision):
-            run_kwargs = {}
-            if self.enable_rsc:
-                run_kwargs['gt_labels'] = targets
-
-            model_output = model(imgs, **run_kwargs)
-            all_unscaled_logits = model_output[0] if isinstance(model_output, (tuple, list)) else model_output
-            return all_unscaled_logits
-
-    def _single_model_losses(self, logits,  targets, model_name):
-        with autocast(enabled=self.mix_precision):
-            loss_summary = {}
+            model_output = model(imgs)
+            all_logits = model_output[0] if isinstance(model_output, (tuple, list)) else model_output
+            loss_summary = dict()
             acc = 0
-            trg_num_samples = logits.numel()
+            trg_num_samples = targets.numel()
             if trg_num_samples == 0:
                 raise RuntimeError("There is no samples in a batch!")
 
-            loss = self.main_loss(logits, targets, aug_index=self.aug_index,
-                                                lam=self.lam, scale=self.scales[model_name])
-            acc += metrics.accuracy(logits, targets)[0].item()
+            loss = 0.
+            for i, mcls_loss in enumerate(self.multiclass_losses):
+                head_gt = targets[:,i]
+                head_logits = all_logits[:,i]
+                valid_mask = head_gt >= 0
+                loss += mcls_loss(head_logits[valid_mask], head_gt[valid_mask], scale=self.scales[model_name])
+                acc += metrics.accuracy(head_logits[valid_mask], head_gt[valid_mask])[0].item()
+
+            if self.multilabel_loss:
+                head_gt = targets[:,self.mixed_cls_heads_info['num_multilabel_classes']:]
+                head_logits = all_logits[:,self.mixed_cls_heads_info['num_multilabel_classes']:]
+                valid_mask = head_gt >= 0
+                loss += self.main_losses(head_logits[valid_mask], head_gt[valid_mask], scale=self.scales[model_name])
+                acc += metrics.accuracy_multilabel(head_logits[valid_mask], head_gt[valid_mask]).item()
+
+            acc /= len(self.multiclass_losses) + int(self.multilabel_loss != None)
+
             loss_summary[f'main_{model_name}'] = loss.item()
 
-            return loss, loss_summary, acc
+            scaled_logits = self.main_loss.get_scale() * all_logits
 
-
-    def _apply_batch_augmentation(self, imgs):
-        def rand_bbox(size, lam):
-            W = size[2]
-            H = size[3]
-            cut_rat = np.sqrt(1. - lam)
-            cut_w = np.int(W * cut_rat)
-            cut_h = np.int(H * cut_rat)
-
-            # uniform
-            cx = np.random.randint(W)
-            cy = np.random.randint(H)
-
-            bbx1 = np.clip(cx - cut_w // 2, 0, W)
-            bby1 = np.clip(cy - cut_h // 2, 0, H)
-            bbx2 = np.clip(cx + cut_w // 2, 0, W)
-            bby2 = np.clip(cy + cut_h // 2, 0, H)
-
-            return bbx1, bby1, bbx2, bby2
-
-        if self.aug_type == 'fmix':
-            r = np.random.rand(1)
-            if self.alpha > 0 and r[0] <= self.aug_prob:
-                lam, fmask = sample_mask(self.alpha, self.decay_power, self.size)
-                index = torch.randperm(imgs.size(0), device=imgs.device)
-                fmask = torch.from_numpy(fmask).float().to(imgs.device)
-                # Mix the images
-                x1 = fmask * imgs
-                x2 = (1 - fmask) * imgs[index]
-                self.aug_index = index
-                self.lam = lam
-                imgs = x1 + x2
-            else:
-                self.aug_index = None
-                self.lam = None
-
-        elif self.aug_type == 'mixup':
-            r = np.random.rand(1)
-            if self.alpha > 0 and r <= self.aug_prob:
-                lam = np.random.beta(self.alpha, self.alpha)
-                index = torch.randperm(imgs.size(0), device=imgs.device)
-
-                imgs = lam * imgs + (1 - lam) * imgs[index, :]
-                self.lam = lam
-                self.aug_index = index
-            else:
-                self.aug_index = None
-                self.lam = None
-
-        elif self.aug_type == 'cutmix':
-            r = np.random.rand(1)
-            if self.alpha > 0 and r <= self.aug_prob:
-                # generate mixed sample
-                lam = np.random.beta(self.alpha, self.alpha)
-                rand_index = torch.randperm(imgs.size(0), device=imgs.device)
-
-                bbx1, bby1, bbx2, bby2 = rand_bbox(imgs.size(), lam)
-                imgs[:, :, bbx1:bbx2, bby1:bby2] = imgs[rand_index, :, bbx1:bbx2, bby1:bby2]
-                # adjust lambda to exactly match pixel ratio
-                lam = 1 - ((bbx2 - bbx1) * (bby2 - bby1) / (imgs.size()[-1] * imgs.size()[-2]))
-                self.lam = lam
-                self.aug_index = rand_index
-            else:
-                self.aug_index = None
-                self.lam = None
-
-        return imgs
-
+            return loss, loss_summary, acc, scaled_logits
 
     def exit_on_plateau_and_choose_best(self, accuracy):
         '''
@@ -295,11 +254,10 @@ class ImageAMSoftmaxEngine(Engine):
         current_metric = np.round(accuracy, 4)
         if self.best_metric >= current_metric:
             # one drop has been done -> start early stopping
-            if round(self.current_lr, 8) < round(self.initial_lr, 8) and self.warmup_finished:
+            if round(self.current_lr, 8) < round(self.initial_lr, 8):
                 self.iter_to_wait += 1
                 if self.iter_to_wait >= self.train_patience:
-                    print("LOG:: The training should be stopped due to no improvements",
-                           f"for {self.train_patience} epochs")
+                    print("LOG:: The training should be stopped due to no improvements for {} epochs".format(self.train_patience))
                     should_exit = True
         else:
             self.best_metric = current_metric

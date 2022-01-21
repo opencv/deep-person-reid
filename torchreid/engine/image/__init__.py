@@ -9,3 +9,4 @@ from __future__ import absolute_import
 
 from .am_softmax import ImageAMSoftmaxEngine
 from .multilabel import MultilabelEngine
+from .multihead import MultiheadEngine

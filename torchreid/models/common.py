@@ -14,7 +14,7 @@ import numpy as np
 
 from torchreid.ops import Dropout
 
-_VALID_MODEL_TYPES = ['classification', 'multilabel']
+_VALID_MODEL_TYPES = ['classification', 'multilabel', 'multihead']
 
 class ModelInterface(nn.Module):
     def __init__(self,
