@@ -587,10 +587,11 @@ class Engine:
                     and not test_only and model_name == self.main_model_name)
             model_type = get_model_attr(model, 'type')
             # do not evaluate second model till last epoch
-            if model_type == 'classification':
-                if (model_name != self.main_model_name
+            if (model_name != self.main_model_name
                     and not test_only and epoch != (self.max_epoch - 1)):
-                    continue
+                continue
+
+            if model_type == 'classification':
                 cur_top1 = self._evaluate_classification(
                     model=model,
                     epoch=epoch,
@@ -609,10 +610,6 @@ class Engine:
                         lr_finder = lr_finder
                     )
             elif model_type == 'multilabel':
-                # do not evaluate second model till last epoch
-                if (model_name != self.main_model_name
-                    and not test_only and epoch != (self.max_epoch - 1)):
-                    continue
                 # we compute mAP, but consider it top1 for consistency
                 # with single label classification
                 cur_top1 = self._evaluate_multilabel_classification(
@@ -630,7 +627,22 @@ class Engine:
                         model_name='EMA model',
                         lr_finder = lr_finder
                     )
-
+            elif model_type == 'multihead':
+                cur_top1 = self._evaluate_multilabel_classification(
+                    model=model,
+                    epoch=epoch,
+                    data_loader=self.test_loader,
+                    model_name=model_name,
+                    lr_finder=lr_finder
+                )
+                if ema_condition:
+                    ema_top1 = self._evaluate_multilabel_classification(
+                        model=self.ema_model.module,
+                        epoch=epoch,
+                        data_loader=self.test_loader,
+                        model_name='EMA model',
+                        lr_finder = lr_finder
+                    )
             if model_id == 0:
                 # the function should return accuracy results for the first (main) model only
                 if self.use_ema_decay and ema_top1 >= cur_top1:
@@ -688,6 +700,19 @@ class Engine:
                 metrics.show_confusion_matrix(norm_cm)
 
         return cmc[0]
+
+    @torch.no_grad()
+    def _evaluate_multihead_classification(self, model, epoch, data_loader, model_name, lr_finder):
+        acc = metrics.evaluate_multihead_classification(data_loader, model, self.use_gpu)
+
+        if self.writer is not None and not lr_finder:
+            self.writer.add_scalar('Val/{}/MHAcc'.format(model_name), acc, epoch + 1)
+
+        if not lr_finder:
+            print('** Results ({}) **'.format(model_name))
+            print('MHAcc: {:.2%}'.format(acc))
+
+        return acc
 
     @staticmethod
     def parse_data_for_train(data, use_gpu=False):

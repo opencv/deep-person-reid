@@ -275,3 +275,7 @@ def evaluate_multilabel_classification(dataloader, model, use_gpu):
     mAP_score = mAP(labels, scores)
 
     return mAP_score
+
+
+def evaluate_multihead_classification(dataloader, model, use_gpu):
+    return 0
