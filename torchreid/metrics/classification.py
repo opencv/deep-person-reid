@@ -278,4 +278,10 @@ def evaluate_multilabel_classification(dataloader, model, use_gpu):
 
 
 def evaluate_multihead_classification(dataloader, model, use_gpu):
+    if get_model_attr(model, 'is_ie_model'):
+        scores, labels = score_extraction_from_ir(dataloader, model)
+    else:
+        scores, labels = score_extraction(dataloader, model, use_gpu)
+
+
     return 0
