@@ -63,18 +63,10 @@ class MultiheadEngine(Engine):
         for model_name in self.get_model_names():
             assert isinstance(self.optims[model_name], SAM) == self.enable_sam, "SAM must be enabled \
                                                                                  for all models or none of them"
-        self.aug_type = aug_type
-        self.aug_prob = aug_prob
-        self.aug_index = None
-        self.lam = None
-        self.alpha = alpha
-        self.decay_power = decay_power
-        self.size =  size
         self.prev_smooth_metric = 0.
         self.mix_precision = mix_precision
         self.scaler = GradScaler(enabled=mix_precision)
 
-        self.num_classes = self.datamanager.num_train_ids
         self.ml_losses = list()
         self.loss_kl = nn.KLDivLoss(reduction='batchmean')
 
@@ -87,7 +79,6 @@ class MultiheadEngine(Engine):
                 self.multiclass_losses.append(CrossEntropyLoss(
                     use_gpu=self.use_gpu,
                     label_smooth=label_smooth,
-                    augmentations=self.aug_type,
                     conf_penalty=conf_penalty,
                     scale=self.am_scale
                 ))
