@@ -38,10 +38,10 @@ class TimmModelsWrapper(ModelInterface):
         self.pooling_type = pooling_type
         if self.loss in ["am_softmax", "am_binary"]:
             self.model.act2 = nn.PReLU()
-            self.classifier = AngleSimpleLinear(self.num_head_features, self.num_classes)
+            self.model.classifier = AngleSimpleLinear(self.num_head_features, self.num_classes)
         else:
             assert self.loss in ["softmax", "asl", "bce"]
-            self.classifier = self.model.get_classifier()
+            self.model.classifier = self.model.get_classifier()
 
     def forward(self, x, return_featuremaps=False, return_all=False, **kwargs):
         with autocast(enabled=self.mix_precision):
@@ -73,7 +73,7 @@ class TimmModelsWrapper(ModelInterface):
         if self.is_mobilenet:
             x  = self.model.act2(self.model.conv_head(x))
         self.dropout(x)
-        return self.classifier(x.view(x.shape[0], -1))
+        return self.model.classifier(x.view(x.shape[0], -1))
 
     def get_config_optim(self, lrs):
         parameters = [
