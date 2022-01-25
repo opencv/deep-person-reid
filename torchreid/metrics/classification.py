@@ -205,8 +205,11 @@ def evaluate_classification(dataloader, model, use_gpu, topk=(1,), labelmap=[]):
     return cmc, m_ap, norm_cm
 
 
-def evaluate_multilabel_classification(dataloader, model, use_gpu):
-
+def mAP(targs, preds, pos_thr=0.5):
+    """Returns the model's average precision for each class
+    Return:
+        ap (FloatTensor): 1xK tensor, with avg precision for each class k
+    """
     def average_precision(output, target):
         epsilon = 1e-8
 
@@ -226,46 +229,42 @@ def evaluate_multilabel_classification(dataloader, model, use_gpu):
 
         return precision_at_i
 
-    def mAP(targs, preds, pos_thr=0.5):
-        """Returns the model's average precision for each class
-        Return:
-            ap (FloatTensor): 1xK tensor, with avg precision for each class k
-        """
-        if np.size(preds) == 0:
-            return 0
-        ap = np.zeros((preds.shape[1]))
-        # compute average precision for each class
-        for k in range(preds.shape[1]):
-            scores = preds[:, k]
-            targets = targs[:, k]
-            ap[k] = average_precision(scores, targets)
-        tp, fp, fn, tn = [], [], [], []
-        for k in range(preds.shape[0]):
-            scores = preds[k,:]
-            targets = targs[k,:]
-            pred = (scores > pos_thr).astype(np.int32)
-            tp.append(((pred + targets) == 2).sum())
-            fp.append(((pred - targets) == 1).sum())
-            fn.append(((pred - targets) == -1).sum())
-            tn.append(((pred + targets) == 0).sum())
+    if np.size(preds) == 0:
+        return 0
+    ap = np.zeros((preds.shape[1]))
+    # compute average precision for each class
+    for k in range(preds.shape[1]):
+        scores = preds[:, k]
+        targets = targs[:, k]
+        ap[k] = average_precision(scores, targets)
+    tp, fp, fn, tn = [], [], [], []
+    for k in range(preds.shape[0]):
+        scores = preds[k,:]
+        targets = targs[k,:]
+        pred = (scores > pos_thr).astype(np.int32)
+        tp.append(((pred + targets) == 2).sum())
+        fp.append(((pred - targets) == 1).sum())
+        fn.append(((pred - targets) == -1).sum())
+        tn.append(((pred + targets) == 0).sum())
 
-        p_c = [tp[i] / (tp[i] + fp[i]) if tp[i] > 0 else 0.0 for i in range(len(tp))]
-        r_c = [tp[i] / (tp[i] + fn[i]) if tp[i] > 0 else 0.0
-                    for i in range(len(tp))]
-        f_c = [2 * p_c[i] * r_c[i] / (p_c[i] + r_c[i]) if tp[i] > 0 else 0.0
-                    for i in range(len(tp))]
+    p_c = [tp[i] / (tp[i] + fp[i]) if tp[i] > 0 else 0.0 for i in range(len(tp))]
+    r_c = [tp[i] / (tp[i] + fn[i]) if tp[i] > 0 else 0.0
+                for i in range(len(tp))]
+    f_c = [2 * p_c[i] * r_c[i] / (p_c[i] + r_c[i]) if tp[i] > 0 else 0.0
+                for i in range(len(tp))]
 
-        mean_p_c = sum(p_c) / len(p_c)
-        mean_r_c = sum(r_c) / len(r_c)
-        mean_f_c = sum(f_c) / len(f_c)
+    mean_p_c = sum(p_c) / len(p_c)
+    mean_r_c = sum(r_c) / len(r_c)
+    mean_f_c = sum(f_c) / len(f_c)
 
-        p_o = sum(tp) / (np.array(tp) + np.array(fp)).sum()
-        r_o = sum(tp) / (np.array(tp) + np.array(fn)).sum()
-        f_o = 2 * p_o * r_o / (p_o + r_o)
+    p_o = sum(tp) / (np.array(tp) + np.array(fp)).sum()
+    r_o = sum(tp) / (np.array(tp) + np.array(fn)).sum()
+    f_o = 2 * p_o * r_o / (p_o + r_o)
 
-        return ap.mean(), mean_p_c, mean_r_c, mean_f_c, p_o, r_o, f_o
+    return ap.mean(), mean_p_c, mean_r_c, mean_f_c, p_o, r_o, f_o
 
 
+def evaluate_multilabel_classification(dataloader, model, use_gpu):
     if get_model_attr(model, 'is_ie_model'):
         scores, labels = score_extraction_from_ir(dataloader, model)
     else:
@@ -277,11 +276,21 @@ def evaluate_multilabel_classification(dataloader, model, use_gpu):
     return mAP_score
 
 
-def evaluate_multihead_classification(dataloader, model, use_gpu):
+def evaluate_multihead_classification(dataloader, model, use_gpu, mixed_cls_heads_info):
     if get_model_attr(model, 'is_ie_model'):
         scores, labels = score_extraction_from_ir(dataloader, model)
     else:
         scores, labels = score_extraction(dataloader, model, use_gpu)
+
+    total_acc = 0
+    for i in range(mixed_cls_heads_info['num_multiclass_heads']):
+        total_acc += mean_top_k_accuracy(scores[:, mixed_cls_heads_info['head_idx_to_logits_range'][i][0] :
+                                                   mixed_cls_heads_info['head_idx_to_logits_range'][i][1]],
+                                        labels[:,i], k=1)
+
+    if mixed_cls_heads_info['num_multilabel_classes'] > 0:
+        total_acc += mAP(labels[:,mixed_cls_heads_info['num_multiclass_heads']:],
+                         scores[:,mixed_cls_heads_info['num_single_label_classes']:])
 
 
     return 0

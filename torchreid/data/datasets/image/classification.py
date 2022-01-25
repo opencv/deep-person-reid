@@ -315,9 +315,15 @@ class MultiheadClassification(ImageDataset):
                     all_classes.append(c)
             class_to_global_idx = {all_classes[i]: i for i in range(len(all_classes))}
             class_to_idx = {}
+            head_idx_to_logits_range = {}
+            num_single_label_classes = 0
+            last_logits_pos = 0
             for i, g in enumerate(exclusive_groups):
+                head_idx_to_logits_range[i] = (last_logits_pos, last_logits_pos + len(g))
+                last_logits_pos += len(g)
                 for j, c in enumerate(g):
                     class_to_idx[c] = (i, j) # group idx and idx inside group
+                    num_single_label_classes += 1
 
             # other labels are in multilabel group
             for j, g in enumerate(single_label_groups):
@@ -326,6 +332,8 @@ class MultiheadClassification(ImageDataset):
             mixed_cls_heads_info = {
                                     'num_multiclass_heads': len(exclusive_groups),
                                     'num_multilabel_classes': len(single_label_groups),
+                                    'head_idx_to_logits_range': head_idx_to_logits_range,
+                                    'num_single_label_classes': num_single_label_classes,
                                     'class_to_global_idx': class_to_global_idx,
                                     'class_to_group_idx': class_to_idx
                                    }

@@ -71,19 +71,19 @@ class MultiheadEngine(Engine):
         self.loss_kl = nn.KLDivLoss(reduction='batchmean')
 
         self.mixed_cls_heads_info = self.datamanager.train_dataset.mixed_cls_heads_info
-        self.multiclass_losses = nn.ModuleList()
+        self.multiclass_loss = None
         self.multilabel_loss = None
 
-        for _ in range(self.mixed_cls_heads_info['num_multiclass_heads']):
+        if self.mixed_cls_heads_info['num_multiclass_heads'] > 0:
             if sm_loss_name == 'softmax':
-                self.multiclass_losses.append(CrossEntropyLoss(
+                self.multiclass_loss = CrossEntropyLoss(
                     use_gpu=self.use_gpu,
                     label_smooth=label_smooth,
                     conf_penalty=conf_penalty,
                     scale=self.am_scale
-                ))
+                )
             elif sm_loss_name == 'am_softmax':
-                self.multiclass_losses.append(AMSoftmaxLoss(
+                self.multiclass_loss = AMSoftmaxLoss(
                     use_gpu=self.use_gpu,
                     label_smooth=label_smooth,
                     margin_type=margin_type,
@@ -93,7 +93,7 @@ class MultiheadEngine(Engine):
                     s=self.am_scale,
                     pr_product=pr_product,
                     symmetric_ce=symmetric_ce,
-                ))
+                )
 
         if self.mixed_cls_heads_info['num_multilabel_classes'] > 0:
             if multilabel_loss_name == 'asl':
@@ -202,19 +202,20 @@ class MultiheadEngine(Engine):
 
             scale = 1.
             loss = 0.
-            for i, mcls_loss in enumerate(self.multiclass_losses):
+            for i in range(self.mixed_cls_heads_info['num_multiclass_heads']):
                 head_gt = targets[:,i]
-                head_logits = all_logits[:,i]
+                head_logits = all_logits[:,self.mixed_cls_heads_info['head_idx_to_logits_range'][i][0] :
+                                           self.mixed_cls_heads_info['head_idx_to_logits_range'][i][1]]
                 valid_mask = head_gt >= 0
                 head_gt = head_gt[valid_mask].view(*valid_mask.shape)
                 head_logits = head_logits[valid_mask].view(*valid_mask.shape)
-                loss += mcls_loss(head_logits, head_gt, scale=self.scales[model_name])
+                loss += self.multiclass_loss(head_logits, head_gt, scale=self.scales[model_name])
                 acc += metrics.accuracy(head_logits, head_gt)[0].item()
-                scale = mcls_loss.get_scale()
+                scale = self.multiclass_loss.get_scale()
 
             if self.multilabel_loss:
                 head_gt = targets[:,self.mixed_cls_heads_info['num_multiclass_heads']:]
-                head_logits = all_logits[:,self.mixed_cls_heads_info['num_multiclass_heads']:]
+                head_logits = all_logits[:,self.mixed_cls_heads_info['num_single_label_classes']:]
                 valid_mask = head_gt >= 0.
                 head_gt = head_gt[valid_mask].view(*valid_mask.shape)
                 head_logits = head_logits[valid_mask].view(*valid_mask.shape)
