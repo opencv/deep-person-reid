@@ -223,7 +223,7 @@ class MultiheadEngine(Engine):
                 acc += metrics.accuracy_multilabel(head_logits, head_gt).item()
                 scale = self.multilabel_loss.get_scale()
 
-            acc /= len(self.multiclass_losses) + int(self.multilabel_loss != None)
+            acc /= self.mixed_cls_heads_info['num_multiclass_heads'] + int(self.multilabel_loss != None)
 
             loss_summary[f'main_{model_name}'] = loss.item()
 

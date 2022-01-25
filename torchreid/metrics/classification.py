@@ -290,7 +290,7 @@ def evaluate_multihead_classification(dataloader, model, use_gpu, mixed_cls_head
 
     if mixed_cls_heads_info['num_multilabel_classes'] > 0:
         total_acc += mAP(labels[:,mixed_cls_heads_info['num_multiclass_heads']:],
-                         scores[:,mixed_cls_heads_info['num_single_label_classes']:])
+                         scores[:,mixed_cls_heads_info['num_single_label_classes']:])[0]
 
 
     total_acc /= mixed_cls_heads_info['num_multiclass_heads'] + int(mixed_cls_heads_info['num_multilabel_classes'] > 0)
