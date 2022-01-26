@@ -703,14 +703,17 @@ class Engine:
 
     @torch.no_grad()
     def _evaluate_multihead_classification(self, model, epoch, data_loader, model_name, lr_finder):
-        acc = metrics.evaluate_multihead_classification(data_loader, model, self.use_gpu, self.mixed_cls_heads_info)
+        mhacc, acc, mAP = metrics.evaluate_multihead_classification(data_loader, model, self.use_gpu,
+                                                                    self.mixed_cls_heads_info)
 
         if self.writer is not None and not lr_finder:
-            self.writer.add_scalar('Val/{}/MHAcc'.format(model_name), acc, epoch + 1)
+            self.writer.add_scalar('Val/{}/MHAcc'.format(model_name), mhacc, epoch + 1)
 
         if not lr_finder:
-            print('** Results ({}) **'.format(model_name))
-            print('MHAcc: {:.2%}'.format(acc))
+            print(f'** Results ({model_name}) **')
+            print('MHAcc: {:.2%}'.format(mhacc))
+            print('mAP: {:.2%}'.format(mAP))
+            print('avgClsAcc: {:.2%}'.format(acc))
 
         return acc
 

@@ -282,17 +282,20 @@ def evaluate_multihead_classification(dataloader, model, use_gpu, mixed_cls_head
     else:
         scores, labels = score_extraction(dataloader, model, use_gpu)
 
-    total_acc = 0
+    total_acc = 0.
+    total_acc_sl = 0.
     for i in range(mixed_cls_heads_info['num_multiclass_heads']):
-        total_acc += mean_top_k_accuracy(scores[:, mixed_cls_heads_info['head_idx_to_logits_range'][i][0] :
-                                                   mixed_cls_heads_info['head_idx_to_logits_range'][i][1]],
-                                        labels[:,i], k=1)
+        cls_acc = mean_top_k_accuracy(scores[:, mixed_cls_heads_info['head_idx_to_logits_range'][i][0] :
+                                                mixed_cls_heads_info['head_idx_to_logits_range'][i][1]],
+                                      labels[:,i], k=1)
+        total_acc += cls_acc
+        total_acc_sl += cls_acc
 
     if mixed_cls_heads_info['num_multilabel_classes'] > 0:
-        total_acc += mAP(labels[:,mixed_cls_heads_info['num_multiclass_heads']:],
+        ml_map = mAP(labels[:,mixed_cls_heads_info['num_multiclass_heads']:],
                          scores[:,mixed_cls_heads_info['num_single_label_classes']:])[0]
-
+        total_acc += ml_map
 
     total_acc /= mixed_cls_heads_info['num_multiclass_heads'] + int(mixed_cls_heads_info['num_multilabel_classes'] > 0)
 
-    return total_acc
+    return total_acc, total_acc_sl / mixed_cls_heads_info['num_multiclass_heads'], ml_map
