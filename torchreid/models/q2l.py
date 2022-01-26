@@ -4,6 +4,7 @@ import math
 
 from .transformer import build_position_encoding
 from .common import ModelInterface
+from torch.cuda.amp import autocast
 
 __all__ = ['build_q2l']
 
@@ -75,35 +76,32 @@ class Query2Label(ModelInterface):
         self.fc = GroupWiseLinear(num_classes, hidden_dim, use_bias=True)
 
     def forward(self, input):
-        src, pos = self.backbone(input)
-        src, pos = src[-1], pos[-1]
+        with autocast(enabled=self.mix_precision):
+            src, pos = self.backbone(input)
+            src, pos = src[-1], pos[-1]
 
-        query_input = self.query_embed.weight
-        hs = self.transformer(self.input_proj(src), query_input, pos)[0] # B,K,d
-        logits = self.fc(hs[-1])
-        if self.similarity_adjustment:
-            logits = self.sym_adjust(logits, self.amb_t)
+            query_input = self.query_embed.weight
+            hs = self.transformer(self.input_proj(src), query_input, pos)[0] # B,K,d
+            logits = self.fc(hs[-1])
+            if self.similarity_adjustment:
+                logits = self.sym_adjust(logits, self.amb_t)
 
-        if not self.training:
-            return [logits]
+            if not self.training:
+                return [logits]
 
-        elif self.loss in ['asl', 'bce', 'am_binary']:
-                out_data = [logits]
-        else:
-            raise KeyError("Unsupported loss: {}".format(self.loss))
+            elif self.loss in ['asl', 'bce', 'am_binary']:
+                    out_data = [logits]
+            else:
+                raise KeyError("Unsupported loss: {}".format(self.loss))
 
-        return tuple(out_data)
-
-    def finetune_paras(self):
-        from itertools import chain
-        return chain(self.transformer.parameters(), self.fc.parameters(), self.input_proj.parameters(), self.query_embed.parameters())
+            return tuple(out_data)
 
     def get_config_optim(self, lrs):
         parameters = [
-            {'params': self.backbone.parameters()},
+            {'params': self.backbone.named_parameters()},
             {'params': self.fc.named_parameters()},
-            {'params': self.input_proj.named_parameters(), 'weight_decay': 0.},
-            {'params': self.query_embed.named_parameters(), 'weight_decay': 0.}
+            {'params': self.input_proj.parameters(), 'weight_decay': 0.},
+            {'params': self.query_embed.parameters(), 'weight_decay': 0.}
         ]
         if isinstance(lrs, list):
             assert len(lrs) == len(parameters)
