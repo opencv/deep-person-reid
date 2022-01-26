@@ -296,7 +296,7 @@ class MultiheadClassification(ImageDataset):
         super().__init__(train, test, mode=mode, **kwargs)
         self.classes = mixed_cls_heads_info['class_to_global_idx']
         self.mixed_cls_heads_info = mixed_cls_heads_info
-        self.num_train_ids = mixed_cls_heads_info['num_multiclass_heads'] + mixed_cls_heads_info['num_multilabel_classes']
+        self.num_train_ids = mixed_cls_heads_info['num_single_label_classes'] + mixed_cls_heads_info['num_multilabel_classes']
 
     @staticmethod
     def load_annotation(annot_path, data_dir):

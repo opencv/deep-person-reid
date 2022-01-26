@@ -206,15 +206,15 @@ class MultiheadEngine(Engine):
                 head_logits = all_logits[:,self.mixed_cls_heads_info['head_idx_to_logits_range'][i][0] :
                                            self.mixed_cls_heads_info['head_idx_to_logits_range'][i][1]]
                 valid_mask = head_gt >= 0
-                head_gt = head_gt[valid_mask].view(*valid_mask.shape)
-                head_logits = head_logits[valid_mask].view(*valid_mask.shape)
+                head_gt = head_gt[valid_mask].long()
+                head_logits = head_logits[valid_mask,:]
                 loss += self.multiclass_loss(head_logits, head_gt, scale=self.scales[model_name])
                 acc += metrics.accuracy(head_logits, head_gt)[0].item()
 
             if self.multilabel_loss:
                 head_gt = targets[:,self.mixed_cls_heads_info['num_multiclass_heads']:]
                 head_logits = all_logits[:,self.mixed_cls_heads_info['num_single_label_classes']:]
-                valid_mask = head_gt >= 0.
+                valid_mask = head_gt >= 0
                 head_gt = head_gt[valid_mask].view(*valid_mask.shape)
                 head_logits = head_logits[valid_mask].view(*valid_mask.shape)
                 loss += self.multilabel_loss(head_logits, head_gt, scale=self.scales[model_name])
