@@ -200,7 +200,6 @@ class MultiheadEngine(Engine):
             if trg_num_samples == 0:
                 raise RuntimeError("There is no samples in a batch!")
 
-            scale = 1.
             loss = 0.
             for i in range(self.mixed_cls_heads_info['num_multiclass_heads']):
                 head_gt = targets[:,i]
@@ -211,7 +210,6 @@ class MultiheadEngine(Engine):
                 head_logits = head_logits[valid_mask].view(*valid_mask.shape)
                 loss += self.multiclass_loss(head_logits, head_gt, scale=self.scales[model_name])
                 acc += metrics.accuracy(head_logits, head_gt)[0].item()
-                scale = self.multiclass_loss.get_scale()
 
             if self.multilabel_loss:
                 head_gt = targets[:,self.mixed_cls_heads_info['num_multiclass_heads']:]
@@ -220,14 +218,13 @@ class MultiheadEngine(Engine):
                 head_gt = head_gt[valid_mask].view(*valid_mask.shape)
                 head_logits = head_logits[valid_mask].view(*valid_mask.shape)
                 loss += self.multilabel_loss(head_logits, head_gt, scale=self.scales[model_name])
-                acc += metrics.accuracy_multilabel(head_logits, head_gt).item()
-                scale = self.multilabel_loss.get_scale()
+                acc += metrics.accuracy_multilabel(head_logits * self.scales[model_name], head_gt).item()
 
             acc /= self.mixed_cls_heads_info['num_multiclass_heads'] + int(self.multilabel_loss != None)
 
             loss_summary[f'main_{model_name}'] = loss.item()
 
-            scaled_logits = scale * all_logits
+            scaled_logits = self.scales[model_name] * all_logits
 
             return loss, loss_summary, acc, scaled_logits
 
