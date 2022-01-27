@@ -13,6 +13,7 @@ import optuna
 from optuna.trial import TrialState
 from optuna.samplers import TPESampler
 from functools import partial
+import functools
 from ruamel.yaml import YAML
 
 
@@ -31,6 +32,15 @@ from torchreid.engine import build_engine
 from torchreid.utils import (Logger, AverageMeter, check_isfile, set_random_seed, load_pretrained_weights)
 
 
+def nested_setattr(obj, attr, val):
+    pre, _, post = attr.rpartition('.')
+    return setattr(nested_getattr(obj, pre) if pre else obj, post, val)
+
+def nested_getattr(obj, attr, *args):
+    def _getattr(obj, attr):
+        return getattr(obj, attr, *args)
+    return functools.reduce(_getattr, [obj] + attr.split('.'))
+
 def read_yaml_config(yaml: YAML, config_path: str):
     yaml.default_flow_style = True
     with open(config_path, 'r') as f:
@@ -41,6 +51,10 @@ def run_training(args, params):
     yaml = YAML()
     path_to_main = osp.relpath(path='/tools/main.py', start=args.root)
     cfg = read_yaml_config(yaml, args.config)
+    for key, value in params.items():
+        nested_setattr(cfg, key, value)
+
+    print(cfg.train.lr)
     fd, tmp_path_to_cfg = tempfile.mkstemp(suffix='.yml')
     try:
         with os.fdopen(fd, 'w') as tmp:
@@ -173,7 +187,7 @@ def objective(cfg, args, trial):
         if trial.should_prune():
             raise optuna.exceptions.TrialPruned()
 
-        should_exit, _ = engine.exit_on_plateau_and_choose_best(top1, smooth_top1)
+        should_exit, _ = engine.exit_on_plateau_and_choose_best(top1)
         should_exit = engine.early_stopping and should_exit
         if should_exit:
             break
@@ -190,6 +204,8 @@ def main():
     parser.add_argument('--aux-config-opts', nargs='+', default=None,
                         help='Modify aux config options using the command-line')
     parser.add_argument('--epochs', default=10, type=int, help='amount of the epochs')
+    parser.add_argument('-drt', '--disable_running_training', default=False,
+                        action='store_true', help='disable full training after optimization')
 
     args = parser.parse_args()
     cfg = get_default_config()
@@ -206,6 +222,7 @@ def main():
     sys.stdout = Logger(osp.join(cfg.data.save_dir, log_name))
 
     print('Show configuration\n{}\n'.format(cfg))
+    print(args)
 
     if cfg.use_gpu:
         torch.backends.cudnn.benchmark = True
