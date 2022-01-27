@@ -15,6 +15,7 @@ from optuna.samplers import TPESampler
 from functools import partial
 import functools
 from ruamel.yaml import YAML
+# from attrdict import AttrDict
 
 
 
@@ -31,15 +32,12 @@ import torchreid
 from torchreid.engine import build_engine
 from torchreid.utils import (Logger, AverageMeter, check_isfile, set_random_seed, load_pretrained_weights)
 
-
-def nested_setattr(obj, attr, val):
-    pre, _, post = attr.rpartition('.')
-    return setattr(nested_getattr(obj, pre) if pre else obj, post, val)
-
-def nested_getattr(obj, attr, *args):
-    def _getattr(obj, attr):
-        return getattr(obj, attr, *args)
-    return functools.reduce(_getattr, [obj] + attr.split('.'))
+def set_attr_dict(dict_, keys, val, i=0):
+    i = i if i else 0
+    if not isinstance(dict_[keys[i]], dict):
+        dict_[keys[i]] = val
+    else:
+        set_attr_dict(dict_[keys[i]], keys, val, i+1)
 
 def read_yaml_config(yaml: YAML, config_path: str):
     yaml.default_flow_style = True
@@ -49,12 +47,11 @@ def read_yaml_config(yaml: YAML, config_path: str):
 
 def run_training(args, params):
     yaml = YAML()
-    path_to_main = osp.relpath(path='/tools/main.py', start=args.root)
-    cfg = read_yaml_config(yaml, args.config)
-    for key, value in params.items():
-        nested_setattr(cfg, key, value)
+    path_to_main = osp.relpath(path='tools/main.py', start=args.root)
+    cfg = read_yaml_config(yaml, args.config_file)
 
-    print(cfg.train.lr)
+    for key, value in params.items():
+        set_attr_dict(cfg, key.split('.'), value)
     fd, tmp_path_to_cfg = tempfile.mkstemp(suffix='.yml')
     try:
         with os.fdopen(fd, 'w') as tmp:
@@ -97,14 +94,14 @@ def finish_process(study, args):
 def objective(cfg, args, trial):
     # Generate the trials.
     # g_ = trial.suggest_int("g_", 1, 7)
-    # asl_pm = trial.suggest_float("asl_pm", 0, 0.5)
+    asl_pm = trial.suggest_float("loss.asl.p_m", 0, 0.5)
     # m = trial.suggest_float("m", 0.01, 0.7)
-    # s = trial.suggest_int("s", 5, 60)
+    s = trial.suggest_int("loss.softmax.s", 5, 60)
     lr = trial.suggest_float("train.lr", 0.001, 0.5)
     # t = trial.suggest_int("t", 1, 7)
     # cfg.loss.softmax.m = m
-    # cfg.loss.softmax.s = s
-    # cfg.loss.asl.p_m = asl_pm
+    cfg.loss.softmax.s = s
+    cfg.loss.asl.p_m = asl_pm
     # cfg.loss.am_binary.amb_t = t
     cfg.train.lr = lr
 
@@ -155,7 +152,7 @@ def objective(cfg, args, trial):
     obj = 0
     engine.start_epoch = 0
     engine.max_epoch = args.epochs
-    print(f"\nnext trial with [lr: {lr}]")
+    print(f"\nnext trial with [lr: {lr}, {asl_pm}, {s}]")
 
     for engine.epoch in range(args.epochs):
         np.random.seed(cfg.train.seed + engine.epoch)
