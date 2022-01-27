@@ -1,7 +1,11 @@
 import os.path as osp
+import os
 import sys
 import datetime
 import time
+import tempfile
+from subprocess import run # nosec
+
 
 import torch
 import numpy as np
@@ -9,6 +13,9 @@ import optuna
 from optuna.trial import TrialState
 from optuna.samplers import TPESampler
 from functools import partial
+from ruamel.yaml import YAML
+
+
 
 from scripts.default_config import (get_default_config,
                                     lr_scheduler_kwargs, model_kwargs,
@@ -24,7 +31,33 @@ from torchreid.engine import build_engine
 from torchreid.utils import (Logger, AverageMeter, check_isfile, set_random_seed, load_pretrained_weights)
 
 
-def finish_process(study):
+def read_yaml_config(yaml: YAML, config_path: str):
+    yaml.default_flow_style = True
+    with open(config_path, 'r') as f:
+        cfg = yaml.load(f)
+    return cfg
+
+def run_training(args, params):
+    yaml = YAML()
+    path_to_main = osp.relpath(path='/tools/main.py', start=args.root)
+    cfg = read_yaml_config(yaml, args.config)
+    fd, tmp_path_to_cfg = tempfile.mkstemp(suffix='.yml')
+    try:
+        with os.fdopen(fd, 'w') as tmp:
+            # do stuff with temp file
+            yaml.default_flow_style = True
+            yaml.dump(cfg, tmp)
+            tmp.close()
+
+        # run training
+        run(['python', f'{path_to_main}',
+            '--config', f'{tmp_path_to_cfg}',
+            '--gpu-num', f'{int(args.gpu_num)}'],
+            shell=False)
+    finally:
+        os.remove(tmp_path_to_cfg)
+
+def finish_process(study, args):
     pruned_trials = study.get_trials(deepcopy=False, states=[TrialState.PRUNED])
     complete_trials = study.get_trials(deepcopy=False, states=[TrialState.COMPLETE])
 
@@ -42,6 +75,10 @@ def finish_process(study):
     for key, value in trial.params.items():
         print("    {}: {}".format(key, value))
 
+    if not args.disable_running_training:
+        params = trial.params
+        run_training(args, params)
+
 
 def objective(cfg, args, trial):
     # Generate the trials.
@@ -49,7 +86,7 @@ def objective(cfg, args, trial):
     # asl_pm = trial.suggest_float("asl_pm", 0, 0.5)
     # m = trial.suggest_float("m", 0.01, 0.7)
     # s = trial.suggest_int("s", 5, 60)
-    lr = trial.suggest_float("lr", 0.001, 0.1)
+    lr = trial.suggest_float("train.lr", 0.001, 0.5)
     # t = trial.suggest_int("t", 1, 7)
     # cfg.loss.softmax.m = m
     # cfg.loss.softmax.s = s
@@ -183,10 +220,10 @@ def main():
         print(f"--- optimization is finished: {datetime.timedelta(seconds=elapsed)} ---")
 
     except KeyboardInterrupt:
-        finish_process(study)
+        finish_process(study, args)
 
     else:
-        finish_process(study)
+        finish_process(study, args)
 
 if __name__ == "__main__":
     main()
