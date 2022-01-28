@@ -106,6 +106,7 @@ class ExternalDatasetWrapper(ImageDataset):
                     self.data_counts[i] = 0
         self.num_train_ids = len(data_provider.get_classes())
         self.classes = classes
+        self.mixed_cls_heads_info = self.data_provider.mixed_cls_heads_info
 
     def __len__(self):
         return len(self.data_provider)
@@ -119,12 +120,16 @@ class ExternalDatasetWrapper(ImageDataset):
     def __getitem__(self, idx: int):
         input_image = self.get_input(idx)
         label = self.data_provider[idx]['label']
+
         if isinstance(label, (tuple, list)): # when multi-label classification is available
-            targets = torch.zeros(self.num_train_ids)
-            for obj in label:
-                idx = int(obj)
-                if idx >= 0:
-                    targets[idx] = 1
+            if len(self.mixed_cls_heads_info):
+                targets = torch.IntTensor(label)
+            else:
+                targets = torch.zeros(self.num_train_ids)
+                for obj in label:
+                    idx = int(obj)
+                    if idx >= 0:
+                        targets[idx] = 1
             label = targets
         else:
             label = int(label)

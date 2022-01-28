@@ -20,6 +20,7 @@ import shutil
 import tempfile
 import time
 from os import path as osp
+from operator import itemgetter
 from typing import List
 
 import cv2 as cv
@@ -40,6 +41,7 @@ from ote_sdk.entities.subset import Subset
 from ote_sdk.entities.train_parameters import UpdateProgressCallback
 from ote_sdk.usecases.reporting.time_monitor_callback import TimeMonitorCallback
 
+# from sc_sdk.utils.label_resolver import LabelResolver
 
 class ClassificationType(Enum):
     MULTICLASS = auto()
@@ -196,19 +198,7 @@ class ClassificationDatasetAdapter(DatasetEntity):
                                                    labels=group_labels, group_type=LabelGroupType.EXCLUSIVE))
                 label_schema.add_group(non_empty_groups[-1])
             label_schema.add_group(empty_group, exclusive_with=non_empty_groups)
-        '''
-        elif self.data_type == ClassificationType.MULTILABEL:
-            emptylabel = LabelEntity(name="Empty label", is_empty=True, domain=Domain.CLASSIFICATION)
-            empty_group = LabelGroup(name="empty", labels=[emptylabel], group_type=LabelGroupType.EMPTY_LABEL)
-            single_groups = []
-            for label in self.project_labels:
-                single_groups.append(LabelGroup(name=label.name, labels=[label], group_type=LabelGroupType.EXCLUSIVE))
-                label_schema.add_group(single_groups[-1])
-            label_schema.add_group(empty_group, exclusive_with=single_groups)
-        '''
         return label_schema
-
-
 
 
 def generate_label_schema(not_empty_labels, multilabel=False):
@@ -227,12 +217,51 @@ def generate_label_schema(not_empty_labels, multilabel=False):
     return label_schema
 
 
-class OTEClassificationDataset():
-    def __init__(self, ote_dataset: DatasetEntity, labels, multilabel=False,
-                 keep_empty_label=False):
+def get_multihead_class_info(label_schema: LabelSchemaEntity):
+    all_groups = label_schema.get_groups(include_empty=False)
+    all_groups_str = []
+    for g in all_groups:
+        group_labels_str = [lbl.name for lbl in g.labels]
+        all_groups_str.append(group_labels_str)
+
+    single_label_groups = [g for g in all_groups_str if len(g) == 1]
+    exclusive_groups = [sorted(g) for g in all_groups_str if len(g) > 1]
+    single_label_groups.sort(key=itemgetter(0))
+    exclusive_groups.sort(key=itemgetter(0))
+    class_to_idx = {}
+    head_idx_to_logits_range = {}
+    num_single_label_classes = 0
+    last_logits_pos = 0
+    for i, g in enumerate(exclusive_groups):
+        head_idx_to_logits_range[i] = (last_logits_pos, last_logits_pos + len(g))
+        last_logits_pos += len(g)
+        for j, c in enumerate(g):
+            class_to_idx[c] = (i, j) # group idx and idx inside group
+            num_single_label_classes += 1
+
+    # other labels are in multilabel group
+    for j, g in enumerate(single_label_groups):
+        class_to_idx[g[0]] = (len(exclusive_groups), j)
+
+    mixed_cls_heads_info = {
+                            'num_multiclass_heads': len(exclusive_groups),
+                            'num_multilabel_classes': len(single_label_groups),
+                            'head_idx_to_logits_range': head_idx_to_logits_range,
+                            'num_single_label_classes': num_single_label_classes,
+                            'class_to_group_idx': class_to_idx,
+                            'all_groups': exclusive_groups + single_label_groups,
+                            }
+    return mixed_cls_heads_info
+
+
+class OTEClassificationDataset:
+    def __init__(self, ote_dataset: DatasetEntity, labels, multilabel=False, hierarchical=False,
+                 mixed_cls_heads_info={}, keep_empty_label=False):
         super().__init__()
         self.ote_dataset = ote_dataset
         self.multilabel = multilabel
+        self.mixed_cls_heads_info = mixed_cls_heads_info
+        self.hierarchical = hierarchical
         self.labels = labels
         self.annotation = []
         self.keep_empty_label = keep_empty_label
@@ -243,12 +272,27 @@ class OTEClassificationDataset():
             item_labels = self.ote_dataset[i].get_roi_labels(self.labels,
                                                              include_empty=self.keep_empty_label)
             if item_labels:
-                for ote_lbl in item_labels:
-                    class_indices.append(self.label_names.index(ote_lbl.name))
+                if not self.hierarchical:
+                    for ote_lbl in item_labels:
+                        class_indices.append(self.label_names.index(ote_lbl.name))
+                else:
+                    num_cls_heads = self.mixed_cls_heads_info['num_multiclass_heads']
+
+                    class_indices = [0]*(self.mixed_cls_heads_info['num_multiclass_heads'] + \
+                                         self.mixed_cls_heads_info['num_multilabel_classes'])
+                    for i in range(num_cls_heads):
+                        class_indices[i] = -1
+                    for ote_lbl in item_labels:
+                        group_idx, in_group_idx = self.mixed_cls_heads_info['class_to_group_idx'][ote_lbl.name]
+                        if group_idx < num_cls_heads:
+                            class_indices[group_idx] = in_group_idx
+                        else:
+                            class_indices[num_cls_heads + in_group_idx] = 1
+
             else: # this supposed to happen only on inference stage or if we have a negative in multilabel data
                 class_indices.append(-1)
 
-            if self.multilabel:
+            if self.multilabel or self.hierarchical:
                 self.annotation.append({'label': tuple(class_indices)})
             else:
                 self.annotation.append({'label': class_indices[0]})
@@ -383,3 +427,33 @@ def get_multilabel_predictions(logits: np.ndarray, labels: List[LabelEntity],
             item_labels.append(label)
 
     return item_labels
+
+
+def get_hierarchical_predictions(logits: np.ndarray, labels: List[LabelEntity],
+                                 label_schema: LabelSchemaEntity, multihead_class_info: dict,
+                                 pos_thr: float = 0.5, activate: bool = True) -> List[ScoredLabel]:
+    predicted_labels = []
+    for i in range(multihead_class_info['num_multiclass_heads']):
+        logits_begin, logits_end = multihead_class_info['head_idx_to_logits_range'][i]
+        head_logits = logits[logits_begin, logits_end]
+        if activate:
+            head_logits = softmax_numpy(head_logits)
+        j = np.argmax(head_logits)
+        label_str = multihead_class_info['all_groups'][i][j]
+        ote_label = next(x.name for x in labels if x.name == label_str)
+        predicted_labels.append(ScoredLabel(label=ote_label, probability=float(head_logits[j])))
+
+    if multihead_class_info['num_multilabel_classes']:
+        logits_begin, logits_end = multihead_class_info['head_idx_to_logits_range'][-1]
+        head_logits = logits[logits_begin, logits_end]
+        if activate:
+            head_logits = sigmoid_numpy(head_logits)
+
+        for i in range(head_logits.shape[0]):
+            if head_logits[i] > pos_thr:
+                label_str = multihead_class_info['all_groups'][-1][i]
+                ote_label = next(x.name for x in labels if x.name == label_str)
+                predicted_labels.append(ScoredLabel(label=ote_label, probability=float(head_logits[i])))
+
+    # return LabelResolver.resolve_labels_probabilistic(label_schema, predicted_labels)
+    return predicted_labels

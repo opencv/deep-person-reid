@@ -42,7 +42,7 @@ from ote_sdk.usecases.tasks.interfaces.evaluate_interface import IEvaluationTask
 from ote_sdk.usecases.tasks.interfaces.export_interface import ExportType, IExportTask
 from ote_sdk.usecases.tasks.interfaces.inference_interface import IInferenceTask
 from ote_sdk.usecases.tasks.interfaces.unload_interface import IUnload
-from ote_sdk.utils.labels_utils import get_empty_label, get_leaf_labels, get_ancestors_by_prediction
+from ote_sdk.utils.labels_utils import get_empty_label
 from scripts.default_config import (get_default_config, imagedata_kwargs,
                                     merge_from_files_with_base, model_kwargs)
 from torchreid.apis.export import export_ir, export_onnx
@@ -51,7 +51,8 @@ from torchreid.integration.sc.parameters import OTEClassificationParameters
 from torchreid.integration.sc.utils import (active_score_from_probs, get_actmap, get_multiclass_predictions,
                                             get_multilabel_predictions, InferenceProgressCallback,
                                             OTEClassificationDataset, preprocess_features_for_actmap,
-                                            sigmoid_numpy, softmax_numpy)
+                                            sigmoid_numpy, softmax_numpy, get_multihead_class_info,
+                                            get_hierarchical_predictions)
 from torchreid.metrics.classification import score_extraction
 from torchreid.utils import load_pretrained_weights
 
@@ -77,10 +78,11 @@ class OTEClassificationInferenceTask(IInferenceTask, IEvaluationTask, IExportTas
                 len(task_environment.label_schema.get_groups(False)) == \
                 len(task_environment.get_labels(include_empty=False))
 
+        self._multihead_class_info = {}
         self._hierarchical = False
         if not self._multilabel and len(task_environment.label_schema.get_groups(False)) > 1:
-            self._labels = get_leaf_labels(task_environment.label_schema)
             self._hierarchical = True
+            self._multihead_class_info = get_multihead_class_info(task_environment.label_schema)
 
         template_file_path = task_environment.model_template.model_template_path
 
@@ -91,10 +93,13 @@ class OTEClassificationInferenceTask(IInferenceTask, IEvaluationTask, IExportTas
 
         if self._multilabel:
             assert self._cfg.model.type == 'multilabel', task_environment.model_template.model_template_path + \
-                ' model template does not support multiclass classification'
+                ' model template does not support multilabel classification'
+        elif self._hierarchical:
+            assert self._cfg.model.type == 'multihead', task_environment.model_template.model_template_path + \
+                ' model template does not support hierarchical classification'
         else:
             assert self._cfg.model.type == 'classification', task_environment.model_template.model_template_path + \
-                ' model template does not support multilabel classification'
+                ' model template does not support multiclass classification'
 
         self.device = torch.device("cuda:0") if torch.cuda.device_count() else torch.device("cpu")
         self._model = self._load_model(task_environment.model, device=self.device)
@@ -152,6 +157,8 @@ class OTEClassificationInferenceTask(IInferenceTask, IEvaluationTask, IExportTas
         self._cfg = get_default_config()
         if self._multilabel:
             config_file_path = os.path.join(base_dir, 'main_model_multilabel.yaml')
+        elif self._hierarchical:
+            config_file_path = os.path.join(base_dir, 'main_model_multihead.yaml')
         else:
             config_file_path = os.path.join(base_dir, 'main_model.yaml')
         merge_from_files_with_base(self._cfg, config_file_path)
@@ -201,9 +208,11 @@ class OTEClassificationInferenceTask(IInferenceTask, IEvaluationTask, IExportTas
         time_monitor = InferenceProgressCallback(math.ceil(len(dataset) / self._cfg.test.batch_size),
                                                  update_progress_callback)
 
-        self._cfg.custom_datasets.roots = [OTEClassificationDataset(dataset, self._labels, self._multilabel,
+        self._cfg.custom_datasets.roots = [OTEClassificationDataset(dataset, self._labels, self._multilabel, self._hierarchical,
+                                                                    self._multihead_class_info,
                                                                     keep_empty_label=self._empty_label in self._labels),
                                            OTEClassificationDataset(dataset, self._labels, self._multilabel,
+                                                                    self._multihead_class_info,
                                                                     keep_empty_label=self._empty_label in self._labels)]
         datamanager = torchreid.data.ImageDataManager(**imagedata_kwargs(self._cfg))
         mix_precision_status = self._model.mix_precision
@@ -229,13 +238,15 @@ class OTEClassificationInferenceTask(IInferenceTask, IEvaluationTask, IExportTas
 
             if self._multilabel:
                 item_labels = get_multilabel_predictions(scores[i], self._labels, activate=False)
-                if not item_labels:
-                    item_labels = [ScoredLabel(self._empty_label, probability=1.)]
+            elif self._hierarchical:
+                item_labels = get_hierarchical_predictions(scores[i], self._labels, self._task_environment.label_schema,
+                                                           self._multihead_class_info, activate=True)
             else:
                 scores[i] = softmax_numpy(scores[i])
                 item_labels = get_multiclass_predictions(scores[i], self._labels, activate=False)
-                if self._hierarchical:
-                    item_labels.extend(get_ancestors_by_prediction(self._task_environment.label_schema, item_labels[0]))
+
+            if (self._multilabel or self._hierarchical) and not item_labels:
+                item_labels = [ScoredLabel(self._empty_label, probability=1.)]
 
             dataset_item.append_labels(item_labels)
             active_score = active_score_from_probs(scores[i])
