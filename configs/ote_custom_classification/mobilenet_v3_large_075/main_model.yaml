@@ -78,7 +78,7 @@ train:
   ema:
     enable: True
     ema_decay: 0.999
-  mix_precision: False
+  mix_precision: True
 
 test:
   batch_size: 128
