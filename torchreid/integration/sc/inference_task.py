@@ -208,8 +208,8 @@ class OTEClassificationInferenceTask(IInferenceTask, IEvaluationTask, IExportTas
         time_monitor = InferenceProgressCallback(math.ceil(len(dataset) / self._cfg.test.batch_size),
                                                  update_progress_callback)
 
-        self._cfg.custom_datasets.roots = [OTEClassificationDataset(dataset, self._labels, self._multilabel, self._hierarchical,
-                                                                    self._multihead_class_info,
+        self._cfg.custom_datasets.roots = [OTEClassificationDataset(dataset, self._labels, self._multilabel,
+                                                                    self._hierarchical, self._multihead_class_info,
                                                                     keep_empty_label=self._empty_label in self._labels),
                                            OTEClassificationDataset(dataset, self._labels, self._multilabel,
                                                                     self._multihead_class_info,

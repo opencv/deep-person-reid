@@ -186,7 +186,7 @@ class ClassificationDatasetAdapter(DatasetEntity):
         if self.data_type == ClassificationType.MULTICLASS:
             main_group = LabelGroup(name="labels", labels=self.project_labels, group_type=LabelGroupType.EXCLUSIVE)
             label_schema.add_group(main_group)
-        elif self.data_type == ClassificationType.MULTIHEAD or self.data_type == ClassificationType.MULTILABEL:
+        elif self.data_type in [ClassificationType.MULTIHEAD, ClassificationType.MULTILABEL]:
             emptylabel = LabelEntity(name="Empty label", is_empty=True, domain=Domain.CLASSIFICATION)
             empty_group = LabelGroup(name="empty", labels=[emptylabel], group_type=LabelGroupType.EMPTY_LABEL)
             non_empty_groups = []
@@ -280,8 +280,8 @@ class OTEClassificationDataset:
 
                     class_indices = [0]*(self.mixed_cls_heads_info['num_multiclass_heads'] + \
                                          self.mixed_cls_heads_info['num_multilabel_classes'])
-                    for i in range(num_cls_heads):
-                        class_indices[i] = -1
+                    for j in range(num_cls_heads):
+                        class_indices[j] = -1
                     for ote_lbl in item_labels:
                         group_idx, in_group_idx = self.mixed_cls_heads_info['class_to_group_idx'][ote_lbl.name]
                         if group_idx < num_cls_heads:
