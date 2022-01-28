@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions
 # and limitations under the License.
 
+from enum import Enum, auto
 import importlib
 import json
 import os
@@ -40,6 +41,12 @@ from ote_sdk.entities.train_parameters import UpdateProgressCallback
 from ote_sdk.usecases.reporting.time_monitor_callback import TimeMonitorCallback
 
 
+class ClassificationType(Enum):
+    MULTICLASS = auto()
+    MULTILABEL = auto()
+    MULTIHEAD = auto()
+
+
 class ClassificationDatasetAdapter(DatasetEntity):
     def __init__(self,
                  train_ann_file=None,
@@ -51,7 +58,7 @@ class ClassificationDatasetAdapter(DatasetEntity):
                  **kwargs):
         self.data_roots = {}
         self.ann_files = {}
-        self.multilabel = False
+        self.data_type = ClassificationType.MULTICLASS
         if train_data_root:
             self.data_roots[Subset.TRAINING] = train_data_root
             self.ann_files[Subset.TRAINING] = train_ann_file
@@ -67,13 +74,11 @@ class ClassificationDatasetAdapter(DatasetEntity):
                 self.data_roots[k] = osp.abspath(v)
                 if self.ann_files[k] and '.json' in self.ann_files[k] and osp.isfile(self.ann_files[k]):
                     self.data_roots[k] = osp.dirname(self.ann_files[k])
-                    self.multilabel = True
-                    self.annotations[k] = self._load_annotation_multilabel(self.ann_files[k], self.data_roots[k])
+                    self.annotations[k], self.data_type = \
+                        self._load_text_annotation(self.ann_files[k], self.data_roots[k])
                 else:
-                    self.annotations[k] = self._load_annotation(self.data_roots[k])
-                    assert not self.multilabel
+                    self.annotations[k], self.data_type = self._load_annotation(self.data_roots[k])
 
-        self.label_map = None
         self.labels = None
         self._set_labels_obtained_from_annotation()
         self.project_labels = [LabelEntity(name=name, domain=Domain.CLASSIFICATION,
@@ -94,25 +99,35 @@ class ClassificationDatasetAdapter(DatasetEntity):
         super().__init__(items=dataset_items, **kwargs)
 
     @staticmethod
-    def _load_annotation_multilabel(annot_path, data_dir):
+    def _load_text_annotation(annot_path, data_dir):
         out_data = []
         with open(annot_path) as f:
             annotation = json.load(f)
-            classes = sorted(annotation['classes'])
-            class_to_idx = {classes[i]: i for i in range(len(classes))}
+            if not 'label_groups' in annotation:
+                all_classes = sorted(annotation['classes'])
+                annotation_type = ClassificationType.MULTILABEL
+                groups = [[c] for c in all_classes]
+            else: # load multihead
+                groups = annotation['label_groups']
+                all_classes = []
+                for g in groups:
+                    for c in g:
+                        all_classes.append(c)
+                annotation_type = ClassificationType.MULTIHEAD
+
             images_info = annotation['images']
             img_wo_objects = 0
             for img_info in images_info:
                 rel_image_path, img_labels = img_info
                 full_image_path = osp.join(data_dir, rel_image_path)
-                labels_idx = [lbl for lbl in img_labels if lbl in class_to_idx]
+                labels_idx = [lbl for lbl in img_labels if lbl in all_classes]
                 assert full_image_path
                 if not labels_idx:
                     img_wo_objects += 1
-                out_data.append((full_image_path, tuple(labels_idx), 0, 0, '', -1, -1))
-        if img_wo_objects:
-            print(f'WARNING: there are {img_wo_objects} images without labels and will be treated as negatives')
-        return out_data, class_to_idx
+                out_data.append((full_image_path, tuple(labels_idx)))
+            if img_wo_objects:
+                print(f'WARNING: there are {img_wo_objects} images without labels and will be treated as negatives')
+        return (out_data, all_classes, groups), annotation_type
 
     @staticmethod
     def _load_annotation(data_dir, filter_classes=None):
@@ -146,14 +161,13 @@ class ClassificationDatasetAdapter(DatasetEntity):
         if not out_data:
             print('Failed to locate images in folder ' + data_dir + f' with extensions {ALLOWED_EXTS}')
 
-        return out_data, class_to_idx
+        all_classes = list(class_to_idx.keys())
+        return (out_data, all_classes, [all_classes]), ClassificationType.MULTICLASS
 
     def _set_labels_obtained_from_annotation(self):
         self.labels = None
-        self.label_map = {}
         for subset in self.data_roots:
-            self.label_map = self.annotations[subset][1]
-            labels = list(self.annotations[subset][1].keys())
+            labels = self.annotations[subset][1]
             if self.labels and self.labels != labels:
                 raise RuntimeError('Labels are different from annotation file to annotation file.')
             self.labels = labels
@@ -163,7 +177,38 @@ class ClassificationDatasetAdapter(DatasetEntity):
         return [label for label in self.project_labels if label.name == label_name][0]
 
     def is_multilabel(self):
-        return self.multilabel
+        return self.data_type == ClassificationType.MULTILABEL
+
+    def generate_label_schema(self):
+        label_schema = LabelSchemaEntity()
+        if self.data_type == ClassificationType.MULTICLASS:
+            main_group = LabelGroup(name="labels", labels=self.project_labels, group_type=LabelGroupType.EXCLUSIVE)
+            label_schema.add_group(main_group)
+        elif self.data_type == ClassificationType.MULTIHEAD or self.data_type == ClassificationType.MULTILABEL:
+            emptylabel = LabelEntity(name="Empty label", is_empty=True, domain=Domain.CLASSIFICATION)
+            empty_group = LabelGroup(name="empty", labels=[emptylabel], group_type=LabelGroupType.EMPTY_LABEL)
+            non_empty_groups = []
+            for g in self.annotations[Subset.TRAINING][2]:
+                group_labels = []
+                for cls in g:
+                    group_labels.append(self._label_name_to_project_label(cls))
+                non_empty_groups.append(LabelGroup(name=group_labels[0].name,
+                                                   labels=group_labels, group_type=LabelGroupType.EXCLUSIVE))
+                label_schema.add_group(non_empty_groups[-1])
+            label_schema.add_group(empty_group, exclusive_with=non_empty_groups)
+        '''
+        elif self.data_type == ClassificationType.MULTILABEL:
+            emptylabel = LabelEntity(name="Empty label", is_empty=True, domain=Domain.CLASSIFICATION)
+            empty_group = LabelGroup(name="empty", labels=[emptylabel], group_type=LabelGroupType.EMPTY_LABEL)
+            single_groups = []
+            for label in self.project_labels:
+                single_groups.append(LabelGroup(name=label.name, labels=[label], group_type=LabelGroupType.EXCLUSIVE))
+                label_schema.add_group(single_groups[-1])
+            label_schema.add_group(empty_group, exclusive_with=single_groups)
+        '''
+        return label_schema
+
+
 
 
 def generate_label_schema(not_empty_labels, multilabel=False):

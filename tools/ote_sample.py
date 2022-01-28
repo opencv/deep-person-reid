@@ -31,7 +31,6 @@ from ote_sdk.usecases.tasks.interfaces.optimization_interface import Optimizatio
 
 from torchreid.integration.nncf.compression import is_nncf_checkpoint
 from torchreid.integration.sc.utils import (ClassificationDatasetAdapter,
-                                            generate_label_schema,
                                             get_task_class)
 
 def parse_args():
@@ -85,7 +84,7 @@ def main(args):
         test_data_root=osp.join(args.data_dir, 'val'),
         test_ann_file=osp.join(args.data_dir, 'val.json'))
 
-    labels_schema = generate_label_schema(dataset.get_labels(), dataset.is_multilabel())
+    labels_schema = dataset.generate_label_schema()
     print(f'Train dataset: {len(dataset.get_subset(Subset.TRAINING))} items')
     print(f'Validation dataset: {len(dataset.get_subset(Subset.VALIDATION))} items')
 
