@@ -242,8 +242,6 @@ class MobileNetV3(ModelInterface):
             if get_embeddings:
                 out_data = [logits, glob_features]
 
-            #print('ret logits')
-            #print(logits.shape)
             out_data = [logits]
 
             return tuple(out_data)
