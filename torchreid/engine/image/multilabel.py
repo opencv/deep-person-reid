@@ -245,13 +245,14 @@ class MultilabelEngine(Engine):
         should_exit = False
         is_candidate_for_best = False
         current_metric = round(accuracy, 4)
+        is_best = current_metric <= self.prev_smooth_accuracy
         # if current metric less than an average
-        if current_metric <= self.prev_smooth_accuracy:
+        if is_best and self.warmup_finished:
             self.iter_to_wait += 1
             if self.iter_to_wait >= self.train_patience:
                 print("LOG:: The training should be stopped due to no improvements for {} epochs".format(self.train_patience))
                 should_exit = True
-        else:
+        elif is_best:
             self.ema_smooth(accuracy)
             self.iter_to_wait = 0
 

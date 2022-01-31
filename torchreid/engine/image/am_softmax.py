@@ -517,7 +517,7 @@ class ImageAMSoftmaxEngine(Engine):
         current_metric = np.round(accuracy, 4)
         if self.best_metric >= current_metric:
             # one drop has been done -> start early stopping
-            if round(self.current_lr, 8) < round(self.initial_lr, 8):
+            if round(self.current_lr, 8) < round(self.initial_lr, 8) and self.warmup_finished:
                 self.iter_to_wait += 1
                 if self.iter_to_wait >= self.train_patience:
                     print("LOG:: The training should be stopped due to no improvements for {} epochs".format(self.train_patience))

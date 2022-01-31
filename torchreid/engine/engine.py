@@ -106,6 +106,7 @@ class Engine:
         self.epoch_interval_for_turn_off_mutual_learning = epoch_interval_for_turn_off_mutual_learning
         self.model_names_to_freeze = []
         self.current_lr = None
+        self.warmup_finished = True
 
         if isinstance(models, (tuple, list)):
             assert isinstance(optimizers, (tuple, list))
@@ -251,7 +252,10 @@ class Engine:
     def get_current_lr(self, names=None):
         names = self.get_model_names(names)
         name = names[0]
-        return self.optims[name].param_groups[0]['lr']
+        lr = self.optims[name].param_groups[0]['lr']
+        if isinstance(self.scheds[name], (WarmupScheduler, OneCycleLR)):
+            return lr, self.scheds[name].warmup_finished
+        return lr, True
 
     def update_lr(self, names=None, output_avg_metric=None):
         names = self.get_model_names(names)
@@ -402,7 +406,7 @@ class Engine:
                 self.update_lr(output_avg_metric = target_metric)
 
             if lr_finder:
-                print(f"epoch: {self.epoch}\t accuracy: {accuracy}\t lr: {self.get_current_lr()}")
+                print(f"epoch: {self.epoch}\t accuracy: {accuracy}\t lr: {self.get_current_lr()[0]}")
                 if trial:
                     trial.report(accuracy, self.epoch)
                     if trial.should_prune():
@@ -543,7 +547,7 @@ class Engine:
                         accuracy=accuracy,
                         eta=eta_str,
                         losses=losses,
-                        lr=self.get_current_lr()
+                        lr=self.get_current_lr()[0]
                     )
                 )
 
@@ -551,13 +555,13 @@ class Engine:
                 n_iter = self.epoch * self.num_batches + self.batch_idx
                 self.writer.add_scalar('Train/time', batch_time.avg, n_iter)
                 self.writer.add_scalar('Train/data', data_time.avg, n_iter)
-                self.writer.add_scalar('Aux/lr', self.get_current_lr(), n_iter)
+                self.writer.add_scalar('Aux/lr', self.get_current_lr()[0], n_iter)
                 self.writer.add_scalar('Accuracy/train', accuracy.avg, n_iter)
                 for name, meter in losses.meters.items():
                     self.writer.add_scalar('Loss/' + name, meter.avg, n_iter)
 
             end = time.time()
-            self.current_lr = self.get_current_lr()
+            self.current_lr, self.warmup_finished = self.get_current_lr()
             if stop_callback and stop_callback.check_stop():
                 break
             if not lr_finder and self.use_ema_decay:

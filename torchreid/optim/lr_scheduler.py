@@ -88,9 +88,9 @@ def _build_scheduler(optimizer,
         max_lr=max_lr, min_lr=min_lr, warmup_steps=warmup, gamma=gamma)
 
     elif lr_scheduler == 'onecycle':
-        scheduler = optim.lr_scheduler.OneCycleLR(optimizer, max_lr=init_learning_rate, steps_per_epoch=num_iter,
-                                                  epochs=int(max_epoch), pct_start=pct_start, final_div_factor=lr_decay_factor,
-                                                  div_factor=100)
+        scheduler = OneCycleLR(optimizer, max_lr=init_learning_rate, steps_per_epoch=num_iter,
+                               epochs=int(max_epoch), pct_start=pct_start, final_div_factor=lr_decay_factor,
+                               div_factor=100)
 
     elif lr_scheduler == 'reduce_on_plateau':
         lb_lr = [lr / lr_decay_factor for lr in init_learning_rate]
@@ -194,7 +194,7 @@ class WarmupScheduler(_LRScheduler):
         self.total_epoch = total_epoch
         self.after_scheduler = after_scheduler
         self.num_bad_epochs = 0
-        self.finished = False
+        self.warmup_finished = False
         super().__init__(optimizer)
         # scale down initial learning rate
         self.init_lr()
@@ -202,9 +202,9 @@ class WarmupScheduler(_LRScheduler):
     def get_lr(self):
         if self.last_epoch > self.total_epoch:
             if self.after_scheduler:
-                if not self.finished:
+                if not self.warmup_finished:
                     self.after_scheduler.base_lrs = [base_lr * self.multiplier for base_lr in self.base_lrs]
-                    self.finished = True
+                    self.warmup_finished = True
             return [base_lr * self.multiplier for base_lr in self.base_lrs]
 
         res = [base_lr * ((self.multiplier - 1.) * self.last_epoch / self.total_epoch + 1.) for base_lr in self.base_lrs]
@@ -217,7 +217,7 @@ class WarmupScheduler(_LRScheduler):
             self.base_lrs.append(param_group['lr'])
 
     def step(self, epoch=None, metrics=None):
-        if self.finished and self.after_scheduler:
+        if self.warmup_finished and self.after_scheduler:
             if isinstance(self.after_scheduler, ReduceLROnPlateauV2):
                 if epoch is None:
                     self.after_scheduler.step(metrics=metrics, epoch=None)
@@ -235,7 +235,7 @@ class WarmupScheduler(_LRScheduler):
     def load_state_dict(self, state_dict):
         """Loads the schedulers state.
         """
-        self.finished = state_dict['finished']
+        self.warmup_finished = state_dict['warmup_finished']
         self.total_epoch = state_dict['total_epoch']
         self.last_epoch = state_dict['last_epoch']
         self.multiplier = state_dict['multiplier']
@@ -269,3 +269,10 @@ class ReduceLROnPlateauV2(optim.lr_scheduler.ReduceLROnPlateau):
         if any([current_lr < init_lr for  init_lr, current_lr in zip(self.init_lr, self._last_lr)]):
             return True
         return False
+
+
+class OneCycleLR(optim.lr_scheduler.OneCycleLR):
+    @property
+    def warmup_finished(self):
+        print(self._schedule_phases[0]['end_step'], self.last_epoch)
+        return self.last_epoch >= self._schedule_phases[0]['end_step']
