@@ -274,5 +274,4 @@ class ReduceLROnPlateauV2(optim.lr_scheduler.ReduceLROnPlateau):
 class OneCycleLR(optim.lr_scheduler.OneCycleLR):
     @property
     def warmup_finished(self):
-        print(self._schedule_phases[0]['end_step'], self.last_epoch)
         return self.last_epoch >= self._schedule_phases[0]['end_step']
