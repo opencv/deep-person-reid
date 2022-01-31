@@ -70,7 +70,7 @@ train:
   batch_size: 64
   lr_scheduler: 'onecycle'
   early_stopping: True
-  pct_start: 0.2
+  pct_start: 0.1
   train_patience: 5
   lr_decay_factor: 1000
   deterministic: True
