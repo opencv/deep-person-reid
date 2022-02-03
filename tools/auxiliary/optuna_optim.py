@@ -106,9 +106,8 @@ def run_training(cfg, opt_cfg, args, trial):
                 cfg = make_change_in_cfg(cfg, field_name, val)
                 log_message += f'{field_name} : {val}; '
 
-        log_message += ']'
-        print(log_message)
-    print(cfg.train.lr, cfg.data.transforms.cutout.cutout_factor, cfg.loss.softmax.m, cfg.model.pooling_type)
+        print(log_message + ']')
+
     # generate datamanager
     num_aux_models = len(cfg.mutual_learning.aux_configs)
     datamanager = build_datamanager(cfg, args.classes)
