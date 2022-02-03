@@ -1,0 +1,32 @@
+
+{
+"epochs" : 1,
+"n_trials": 1,
+"float":
+    [
+        {
+    "name": "train.lr",
+    "range": [0.001, 0.1],
+    "step": 0.001
+    },
+    {
+        "name": "data.transforms.cutout.cutout_factor",
+        "range": [0.1, 1.0],
+        "step": 0.1
+    }
+    ],
+"int":[
+        {
+            "name": "loss.softmax.s",
+            "range": [1.0, 50.0],
+            "step": 1.0
+        }
+    ],
+"categorical":[
+        {
+            "name": "model.pooling_type",
+            "range": ["avg","max","avg+max"]
+        }
+    ]
+
+}

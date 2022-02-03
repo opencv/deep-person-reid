@@ -207,7 +207,7 @@ def main():
     parser.add_argument('--epochs', default=10, type=int, help='amount of the epochs')
     parser.add_argument('-drt', '--disable_running_training', default=False,
                         action='store_true', help='disable full training after optimization')
-    parser.add_argument('--opt-configs', nargs="+", default=['./opt_configs/test.json'],
+    parser.add_argument('--opt-configs', nargs="+", default=['./opt_configs/example.json'],
                         help='path to optimization config')
 
     optimized_params = None
