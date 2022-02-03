@@ -5,7 +5,7 @@ import datetime
 import time
 import tempfile
 from subprocess import run # nosec
-
+import copy
 
 import torch
 import numpy as np
@@ -13,7 +13,6 @@ import optuna
 from optuna.trial import TrialState
 from optuna.samplers import TPESampler
 from functools import partial
-import functools
 from ruamel.yaml import YAML
 import json
 
@@ -30,7 +29,7 @@ from scripts.script_utils import (build_base_argparser, reset_config,
 
 import torchreid
 from torchreid.engine import build_engine
-from torchreid.utils import (Logger, AverageMeter, check_isfile, set_random_seed, load_pretrained_weights)
+from torchreid.utils import (Logger, AverageMeter, check_isfile, set_random_seed, load_pretrained_weights, mkdir_if_missing)
 
 
 def read_json_cfg(cfg):
@@ -56,26 +55,6 @@ def read_yaml_config(yaml: YAML, config_path: str):
         cfg = yaml.load(f)
     return cfg
 
-def run_full_training(args, cfg):
-    yaml = YAML()
-    path_to_main = osp.relpath(path='tools/main.py', start=args.root)
-    fd, tmp_path_to_cfg = tempfile.mkstemp(suffix='.yml')
-    try:
-        with os.fdopen(fd, 'w') as tmp:
-            # do stuff with temp file
-            yaml.default_flow_style = True
-            yaml.dump(cfg, tmp)
-            tmp.close()
-        # run training
-        print(tmp_path_to_cfg)
-        run(['python', f'{path_to_main}',
-            '--config', f'{tmp_path_to_cfg}',
-            '--gpu-num', f'{int(args.gpu_num)}'],
-            shell=False)
-
-    finally:
-        os.remove(tmp_path_to_cfg)
-
 def finish_process(study):
     pruned_trials = study.get_trials(deepcopy=False, states=[TrialState.PRUNED])
     complete_trials = study.get_trials(deepcopy=False, states=[TrialState.COMPLETE])
@@ -97,34 +76,39 @@ def finish_process(study):
     return trial.params
 
 
-def objective(cfg, opt_cfg, args, trial):
+def run_training(cfg, opt_cfg, args, trial):
+    # define max epochs
+    max_epochs = opt_cfg["epochs"] if opt_cfg else cfg['train']['max_epoch']
 
-    ### READING A JSON CONFIG ####
-    log_message = "\nnext trial with [ "
-    if 'float' in opt_cfg:
-        for param in opt_cfg['float']:
-            field_name = param['name']
-            step = param['step'] if param['step'] > 0 else None
-            val = trial.suggest_float(field_name, *param['range'], step=step)
-            cfg = make_change_in_cfg(cfg, field_name, val)
-            log_message += f'{field_name} : {val}; '
+    if opt_cfg is not None:
+        ### READING A JSON OPTIMIZATION CONFIG ####
+        log_message = "\nnext trial with [ "
+        if 'float' in opt_cfg:
+            for param in opt_cfg['float']:
+                field_name = param['name']
+                step = param['step'] if param['step'] > 0 else None
+                val = trial.suggest_float(field_name, *param['range'], step=step)
+                cfg = make_change_in_cfg(cfg, field_name, val)
+                log_message += f'{field_name} : {val}; '
 
-    if 'int' in opt_cfg:
-        for param in opt_cfg['int']:
-            field_name = param['name']
-            step = param['step'] if param['step'] > 0 else None
-            val = trial.suggest_int(field_name, *param['range'], step=step)
-            cfg = make_change_in_cfg(cfg, field_name, val)
-            log_message += f'{field_name} : {val}; '
+        if 'int' in opt_cfg:
+            for param in opt_cfg['int']:
+                field_name = param['name']
+                step = param['step'] if param['step'] > 0 else None
+                val = trial.suggest_int(field_name, *param['range'], step=step)
+                cfg = make_change_in_cfg(cfg, field_name, val)
+                log_message += f'{field_name} : {val}; '
 
-    if 'categorical' in opt_cfg:
-        for param in opt_cfg['categorical']:
-            field_name = param['name']
-            val = trial.suggest_categorical(field_name, param['range'])
-            cfg = make_change_in_cfg(cfg, field_name, val)
-            log_message += f'{field_name} : {val}; '
+        if 'categorical' in opt_cfg:
+            for param in opt_cfg['categorical']:
+                field_name = param['name']
+                val = trial.suggest_categorical(field_name, param['range'])
+                cfg = make_change_in_cfg(cfg, field_name, val)
+                log_message += f'{field_name} : {val}; '
 
-    log_message += ']'
+        log_message += ']'
+        print(log_message)
+    print(cfg.train.lr, cfg.data.transforms.cutout.cutout_factor, cfg.loss.softmax.m, cfg.model.pooling_type)
     # generate datamanager
     num_aux_models = len(cfg.mutual_learning.aux_configs)
     datamanager = build_datamanager(cfg, args.classes)
@@ -171,9 +155,9 @@ def objective(cfg, opt_cfg, args, trial):
     test_acc = AverageMeter()
     obj = 0
     engine.start_epoch = 0
-    engine.max_epoch = opt_cfg["epochs"]
+    engine.max_epoch = max_epochs
 
-    for engine.epoch in range(opt_cfg["epochs"]):
+    for engine.epoch in range(max_epochs):
         np.random.seed(cfg.train.seed + engine.epoch)
         avg_loss = engine.train(
             print_freq=20000,
@@ -197,10 +181,11 @@ def objective(cfg, opt_cfg, args, trial):
         if not engine.per_batch_annealing:
             engine.update_lr(output_avg_metric = target_metric)
 
-        trial.report(obj, engine.epoch)
+        if trial is not None:
+            trial.report(obj, engine.epoch)
 
         # Handle pruning based on the intermediate value.
-        if trial.should_prune():
+        if trial is not None and trial.should_prune():
             raise optuna.exceptions.TrialPruned()
 
         should_exit, _ = engine.exit_on_plateau_and_choose_best(top1)
@@ -233,26 +218,30 @@ def main():
         merge_from_files_with_base(cfg, args.config_file)
     reset_config(cfg, args)
     cfg.merge_from_list(args.opts)
-    print(args.opt_configs)
-    for optim_cfg in args.opt_configs:
+    logger = Logger(None)
+    sys.stdout = logger
+
+    for i, optim_cfg in enumerate(args.opt_configs):
+        if logger.file is not None:
+            logger.file.close()
         set_random_seed(cfg.train.seed, cfg.train.deterministic)
         opt_cfg = read_json_cfg(optim_cfg)
-        log_name = 'optuna.log'
-        log_name += time.strftime('-%Y-%m-%d-%H-%M-%S')
-        sys.stdout = Logger(osp.join(cfg.data.save_dir, log_name))
+        strftime = time.strftime('-%Y-%m-%d-%H-%M-%S')
+        log_file = osp.join(cfg.data.save_dir, f'optuna_{i}{strftime}.log')
+        mkdir_if_missing(osp.dirname(log_file))
+        logger.file = open(log_file, 'w')
         if optimized_params:
             for name, value in optimized_params.items():
                 cfg = make_change_in_cfg(cfg, name, value)
 
         print('Show configuration\n{}\n'.format(cfg))
 
-
         if cfg.use_gpu:
             torch.backends.cudnn.benchmark = True
 
         sampler = TPESampler(n_startup_trials=5, seed=True)
         study = optuna.create_study(study_name='classification task', direction="maximize", sampler=sampler)
-        objective_partial = partial(objective, cfg, opt_cfg, args)
+        objective_partial = partial(run_training, cfg, opt_cfg, args)
         try:
             start_time = time.time()
             study.optimize(objective_partial, n_trials=opt_cfg['n_trials'], timeout=None)
@@ -263,7 +252,7 @@ def main():
             optimized_params = finish_process(study)
 
         except: # there is some general exception (some error in training)
-            print(f"ERROR:: --- optimization is failed: {datetime.timedelta(seconds=elapsed)} ---")
+            print("ERROR:: --- optimization is failed! ---")
             exit()
 
         else:
@@ -273,9 +262,16 @@ def main():
         assert optimized_params, "There is no optimized hyperparameter!"
         del study
         del objective_partial
+        logger.file.close()
         for name, value in optimized_params.items():
             cfg = make_change_in_cfg(cfg, name, value)
-        run_full_training(args, cfg)
+        set_random_seed(cfg.train.seed, cfg.train.deterministic)
+        strftime = time.strftime('-%Y-%m-%d-%H-%M-%S')
+        log_file = osp.join(cfg.data.save_dir, f'train{strftime}.log')
+        mkdir_if_missing(osp.dirname(log_file))
+        logger.file = open(log_file, 'w')
+        print('Show configuration\n{}\n'.format(cfg))
+        run_training(cfg, opt_cfg=None, args=args, trial=None)
 
 if __name__ == "__main__":
     main()

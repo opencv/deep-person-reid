@@ -63,7 +63,7 @@ def main():
     log_name += time.strftime('-%Y-%m-%d-%H-%M-%S')
     sys.stdout = Logger(osp.join(cfg.data.save_dir, log_name))
 
-    # print('Show configuration\n{}\n'.format(cfg))
+    print('Show configuration\n{}\n'.format(cfg))
 
     if cfg.use_gpu:
         torch.backends.cudnn.benchmark = True
