@@ -189,15 +189,13 @@ class ClassificationDatasetAdapter(DatasetEntity):
         elif self.data_type in [ClassificationType.MULTIHEAD, ClassificationType.MULTILABEL]:
             emptylabel = LabelEntity(name="Empty label", is_empty=True, domain=Domain.CLASSIFICATION)
             empty_group = LabelGroup(name="empty", labels=[emptylabel], group_type=LabelGroupType.EMPTY_LABEL)
-            non_empty_groups = []
             for g in self.annotations[Subset.TRAINING][2]:
                 group_labels = []
                 for cls in g:
                     group_labels.append(self._label_name_to_project_label(cls))
-                non_empty_groups.append(LabelGroup(name=group_labels[0].name,
-                                                   labels=group_labels, group_type=LabelGroupType.EXCLUSIVE))
-                label_schema.add_group(non_empty_groups[-1])
-            label_schema.add_group(empty_group, exclusive_with=non_empty_groups)
+                label_schema.add_group(LabelGroup(name=group_labels[0].name,
+                                                  labels=group_labels, group_type=LabelGroupType.EXCLUSIVE))
+            label_schema.add_group(empty_group)
         return label_schema
 
 
