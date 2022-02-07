@@ -173,11 +173,9 @@ def generate_label_schema(not_empty_labels, multilabel=False):
     if multilabel:
         emptylabel = LabelEntity(name="Empty label", is_empty=True, domain=Domain.CLASSIFICATION)
         empty_group = LabelGroup(name="empty", labels=[emptylabel], group_type=LabelGroupType.EMPTY_LABEL)
-        single_groups = []
         for label in not_empty_labels:
-            single_groups.append(LabelGroup(name=label.name, labels=[label], group_type=LabelGroupType.EXCLUSIVE))
-            label_schema.add_group(single_groups[-1])
-        label_schema.add_group(empty_group, exclusive_with=single_groups)
+            label_schema.add_group(LabelGroup(name=label.name, labels=[label], group_type=LabelGroupType.EXCLUSIVE))
+        label_schema.add_group(empty_group)
     else:
         main_group = LabelGroup(name="labels", labels=not_empty_labels, group_type=LabelGroupType.EXCLUSIVE)
         label_schema.add_group(main_group)
