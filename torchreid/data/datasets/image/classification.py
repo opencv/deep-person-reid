@@ -46,8 +46,7 @@ class Classification(ImageDataset):
             classes = []
             train, test = [], []
 
-        super().__init__(train, test, mode=mode, **kwargs)
-        self.classes = classes
+        super().__init__(train, test, mode=mode, classes=classes, **kwargs)
 
     @staticmethod
     def load_annotation(annot_path, data_dir):
@@ -96,8 +95,8 @@ class ExternalDatasetWrapper(ImageDataset):
             classes = []
             train, test = [], []
 
-        super().__init__(train, test, mode=mode, **kwargs)
-
+        super().__init__(train, test, mode=mode, classes=classes,
+                         mixed_cls_heads_info=self.data_provider.mixed_cls_heads_info, **kwargs)
 
         # restore missing classes in train
         if mode == 'train':
@@ -105,8 +104,6 @@ class ExternalDatasetWrapper(ImageDataset):
                 if i not in self.data_counts:
                     self.data_counts[i] = 0
         self.num_train_ids = len(data_provider.get_classes())
-        self.classes = classes
-        self.mixed_cls_heads_info = self.data_provider.mixed_cls_heads_info
 
     def __len__(self):
         return len(self.data_provider)
@@ -170,10 +167,7 @@ class ClassificationImageFolder(ImageDataset):
             classes = []
             train, test = [], []
 
-        super().__init__(train, test, mode=mode, **kwargs)
-
-        self.classes = classes
-
+        super().__init__(train, test, mode=mode, classes=classes, **kwargs)
 
     @staticmethod
     def load_annotation(data_dir, filter_classes=None):
@@ -241,8 +235,7 @@ class MultiLabelClassification(ImageDataset):
             train, test = [], []
 
 
-        super().__init__(train, test, mode=mode, **kwargs)
-        self.classes = classes
+        super().__init__(train, test, mode=mode, classes=classes, **kwargs)
 
     @staticmethod
     def load_annotation(annot_path, data_dir):
@@ -298,10 +291,8 @@ class MultiheadClassification(ImageDataset):
             mixed_cls_heads_info = []
             train, test = [], []
 
-        super().__init__(train, test, mode=mode, **kwargs)
-        self.classes = mixed_cls_heads_info['class_to_global_idx']
-        self.mixed_cls_heads_info = mixed_cls_heads_info
-        self.num_train_ids = mixed_cls_heads_info['num_single_label_classes'] + mixed_cls_heads_info['num_multilabel_classes']
+        super().__init__(train, test, mode=mode, classes=mixed_cls_heads_info['class_to_global_idx'],
+                         mixed_cls_heads_info=mixed_cls_heads_info, **kwargs)
 
     @staticmethod
     def load_annotation(annot_path, data_dir):
@@ -351,10 +342,22 @@ class MultiheadClassification(ImageDataset):
 
                 labels_idx = [class_to_idx[lbl] for lbl in img_labels if lbl in class_to_idx]
 
+                class_indices = [0]*(mixed_cls_heads_info['num_multiclass_heads'] + \
+                                     mixed_cls_heads_info['num_multilabel_classes'])
+
+                for j in range(mixed_cls_heads_info['num_multiclass_heads']):
+                    class_indices[j] = -1
+
+                for group_idx, in_group_idx in labels_idx:
+                    if group_idx < mixed_cls_heads_info['num_multiclass_heads']:
+                        class_indices[group_idx] = in_group_idx
+                    else:
+                        class_indices[mixed_cls_heads_info['num_multiclass_heads'] + in_group_idx] = 1
+
                 assert full_image_path
                 if not labels_idx:
                     img_wo_objects += 1
-                out_data.append((full_image_path, tuple(labels_idx)))
+                out_data.append((full_image_path, tuple(class_indices)))
         if img_wo_objects:
             print(f'WARNING: there are {img_wo_objects} images without labels and will be treated as negatives')
         return out_data, mixed_cls_heads_info

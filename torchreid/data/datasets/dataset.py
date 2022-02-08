@@ -30,9 +30,12 @@ class ImageDataset:
                  transform=None,
                  mode='train',
                  verbose=True,
+                 mixed_cls_heads_info={},
+                 classes={},
                  **kwargs):
 
-        self.classes = {}
+        self.classes = classes
+        self.mixed_cls_heads_info = mixed_cls_heads_info
         self.train = train
         self.test = test
         self.transform = transform
@@ -63,16 +66,8 @@ class ImageDataset:
         obj_id = input_record[1]
 
         if isinstance(obj_id, (tuple, list)): # when multi-label classification is available
-            if len(obj_id) and isinstance(obj_id[0], (tuple, list)):
-                num_cls_heads = self.mixed_cls_heads_info['num_multiclass_heads']
-                targets = torch.zeros(self.mixed_cls_heads_info['num_multiclass_heads'] + \
-                                        self.mixed_cls_heads_info['num_multilabel_classes'])
-                targets[0 : num_cls_heads] = -1
-                for group_idx, in_group_idx in obj_id:
-                    if group_idx < num_cls_heads:
-                        targets[group_idx] = in_group_idx
-                    else:
-                        targets[num_cls_heads + in_group_idx] = 1
+            if len(self.mixed_cls_heads_info):
+                targets = torch.IntTensor(obj_id)
             else:
                 targets = torch.zeros(self.num_train_ids)
                 for obj in obj_id:
@@ -103,8 +98,7 @@ class ImageDataset:
 
         return counts
 
-    @staticmethod
-    def parse_data(data):
+    def parse_data(self, data):
         """Parses data list and returns the number of categories.
         """
         if not data:
@@ -113,8 +107,13 @@ class ImageDataset:
         for record in data:
             label = record[1]
             if isinstance(label, (list, tuple)):
-                if len(label) and isinstance(label[0], (tuple, list)):
-                    ids.update([1])
+                if self.mixed_cls_heads_info:
+                    for i in range(self.mixed_cls_heads_info['num_multiclass_heads']):
+                        if label[i] >= 0:
+                            ids.update([self.mixed_cls_heads_info['head_idx_to_logits_range'][i][0] + label[i]])
+                    for i in range(self.mixed_cls_heads_info['num_multilabel_classes']):
+                        if label[self.mixed_cls_heads_info['num_multiclass_heads'] + i]:
+                            ids.update([self.mixed_cls_heads_info['num_single_label_classes'] + i])
                 else:
                     ids.update(set(label))
             else:
