@@ -288,7 +288,11 @@ class OTEClassificationDataset:
                             class_indices[num_cls_heads + in_group_idx] = 1
 
             else: # this supposed to happen only on inference stage or if we have a negative in multilabel data
-                class_indices.append(-1)
+                if self.mixed_cls_heads_info:
+                    class_indices = [-1]*(self.mixed_cls_heads_info['num_multiclass_heads'] + \
+                                          self.mixed_cls_heads_info['num_multilabel_classes'])
+                else:
+                    class_indices.append(-1)
 
             if self.multilabel or self.hierarchical:
                 self.annotation.append({'label': tuple(class_indices)})
@@ -433,24 +437,24 @@ def get_hierarchical_predictions(logits: np.ndarray, labels: List[LabelEntity],
     predicted_labels = []
     for i in range(multihead_class_info['num_multiclass_heads']):
         logits_begin, logits_end = multihead_class_info['head_idx_to_logits_range'][i]
-        head_logits = logits[logits_begin, logits_end]
+        head_logits = logits[logits_begin : logits_end]
         if activate:
             head_logits = softmax_numpy(head_logits)
         j = np.argmax(head_logits)
         label_str = multihead_class_info['all_groups'][i][j]
-        ote_label = next(x.name for x in labels if x.name == label_str)
+        ote_label = next(x for x in labels if x.name == label_str)
         predicted_labels.append(ScoredLabel(label=ote_label, probability=float(head_logits[j])))
 
     if multihead_class_info['num_multilabel_classes']:
-        logits_begin, logits_end = multihead_class_info['head_idx_to_logits_range'][-1]
-        head_logits = logits[logits_begin, logits_end]
+        logits_begin, logits_end = multihead_class_info['num_single_label_classes'], -1
+        head_logits = logits[logits_begin : logits_end]
         if activate:
             head_logits = sigmoid_numpy(head_logits)
 
         for i in range(head_logits.shape[0]):
             if head_logits[i] > pos_thr:
-                label_str = multihead_class_info['all_groups'][-1][i]
-                ote_label = next(x.name for x in labels if x.name == label_str)
+                label_str = multihead_class_info['all_groups'][multihead_class_info['num_multiclass_heads'] + i][0]
+                ote_label = next(x for x in labels if x.name == label_str)
                 predicted_labels.append(ScoredLabel(label=ote_label, probability=float(head_logits[i])))
 
     # return LabelResolver.resolve_labels_probabilistic(label_schema, predicted_labels)
