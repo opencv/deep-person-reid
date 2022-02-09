@@ -101,18 +101,17 @@ class MultilabelEngine(Engine):
                                                                           targets,
                                                                           model_name)
                 loss_summary.update(model_loss_summary)
-                all_models_logits[i] = all_models_logits[i] * self.scales[model_name]
                 if i == 0: # main model
                     main_acc = acc
                 # compute mutual loss
                 if mutual_learning:
                     mutual_loss = 0
 
-                    trg_probs = torch.sigmoid(all_models_logits[i])
+                    trg_probs = torch.sigmoid(all_models_logits[i] * self.scales[model_name])
                     for j in range(num_models):
                         if i != j:
                             with torch.no_grad():
-                                aux_probs = torch.sigmoid(all_models_logits[j])
+                                aux_probs = torch.sigmoid(all_models_logits[j] * self.scales[model_names[j]])
                             mutual_loss += self.kl_div_binary(trg_probs, aux_probs)
 
                     loss += mutual_loss / (num_models - 1)
@@ -171,8 +170,8 @@ class MultilabelEngine(Engine):
             raise RuntimeError("There is no samples in a batch!")
 
         loss = self.main_loss(logits, targets, aug_index=self.aug_index,
-                                            lam=self.lam, scale=self.scales[model_name])
-        acc += metrics.accuracy_multilabel(logits, targets).item()
+                              lam=self.lam, scale=self.scales[model_name])
+        acc += metrics.accuracy_multilabel(logits * self.scales[model_name], targets).item()
         loss_summary[f'main_{model_name}'] = loss.item()
 
         return loss, loss_summary, acc
