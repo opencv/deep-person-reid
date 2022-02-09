@@ -49,7 +49,6 @@ def score_extraction(data_loader, model, use_gpu, labelmap=[], head_id=0,
         gt_labels = torch.cat(gt_labels, 0).data.cpu().numpy()
         if apply_scale:
             s = get_model_attr(model, 'scale')
-            print('Scale', s)
             if s != 1.:
                 out_scores *= s
 
