@@ -15,7 +15,7 @@ from torchreid.utils import get_model_attr
 __FEATURE_DUMP_MODES = ['none', 'all', 'vecs']
 
 def score_extraction(data_loader, model, use_gpu, labelmap=[], head_id=0,
-                        perf_monitor=None, feature_dump_mode='none'):
+                        perf_monitor=None, feature_dump_mode='none', apply_scale=False):
 
     assert feature_dump_mode in __FEATURE_DUMP_MODES
     return_featuremaps = feature_dump_mode != __FEATURE_DUMP_MODES[0]
@@ -47,6 +47,11 @@ def score_extraction(data_loader, model, use_gpu, labelmap=[], head_id=0,
 
         out_scores = torch.cat(out_scores, 0).data.cpu().numpy()
         gt_labels = torch.cat(gt_labels, 0).data.cpu().numpy()
+        if apply_scale:
+            s = get_model_attr(model, 'scale')
+            print('Scale', s)
+            if s != 1.:
+                out_scores *= s
 
         if all_feature_vecs:
             all_feature_vecs = torch.cat(all_feature_vecs, 0).data.cpu().numpy()
@@ -61,7 +66,7 @@ def score_extraction(data_loader, model, use_gpu, labelmap=[], head_id=0,
     return out_scores, gt_labels
 
 
-def score_extraction_from_ir(data_loader, model, labelmap=[]):
+def score_extraction_from_ir(data_loader, model, labelmap=[], apply_scale=False):
     out_scores, gt_labels = [], []
     for data in data_loader.dataset:
         image, label = np.asarray(data[0]), data[1]
@@ -72,6 +77,10 @@ def score_extraction_from_ir(data_loader, model, labelmap=[]):
         gt_labels.append(label)
 
     out_scores = np.concatenate(out_scores, 0)
+    if apply_scale:
+        s = get_model_attr(model, 'scale')
+        if s != 1.:
+            out_scores *= s
     if model.type == 'multilabel':
         gt_labels = np.concatenate(gt_labels, 0)
     else:
@@ -261,9 +270,6 @@ def evaluate_multilabel_classification(dataloader, model, use_gpu):
     else:
         scores, labels = score_extraction(dataloader, model, use_gpu)
 
-    s = get_model_attr(model, 'scale')
-    if s != 1.:
-        scores *= s
     scores = 1. / (1 + np.exp(-scores))
     mAP_score = mAP(labels, scores)
 

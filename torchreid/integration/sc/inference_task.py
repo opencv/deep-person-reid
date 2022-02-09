@@ -213,7 +213,7 @@ class OTEClassificationInferenceTask(IInferenceTask, IEvaluationTask, IExportTas
         dump_features = not inference_parameters.is_evaluation
         inference_results, _ = score_extraction(datamanager.test_loader,
                                                 self._model, self._cfg.use_gpu, perf_monitor=time_monitor,
-                                                feature_dump_mode='all' if dump_features else 'vecs')
+                                                feature_dump_mode='all' if dump_features else 'vecs', apply_scale=True)
         self._model.mix_precision = mix_precision_status
         if dump_features:
             scores, features, feature_vecs = inference_results
