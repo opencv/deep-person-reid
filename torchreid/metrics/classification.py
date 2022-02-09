@@ -14,7 +14,7 @@ from torchreid.utils import get_model_attr
 
 __FEATURE_DUMP_MODES = ['none', 'all', 'vecs']
 
-def score_extraction(data_loader, model, use_gpu, labelmap=[], head_id=0, 
+def score_extraction(data_loader, model, use_gpu, labelmap=[], head_id=0,
                         perf_monitor=None, feature_dump_mode='none'):
 
     assert feature_dump_mode in __FEATURE_DUMP_MODES
@@ -261,6 +261,9 @@ def evaluate_multilabel_classification(dataloader, model, use_gpu):
     else:
         scores, labels = score_extraction(dataloader, model, use_gpu)
 
+    s = get_model_attr(model, 'scale')
+    if s != 1.:
+        scores *= s
     scores = 1. / (1 + np.exp(-scores))
     mAP_score = mAP(labels, scores)
 
