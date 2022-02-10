@@ -75,7 +75,6 @@ class ImageDataManager():
             custom_dataset_types=custom_dataset_types,
             filter_classes=filter_classes,
         )
-        self.train_dataset = train_dataset
 
         self._data_counts = train_dataset.data_counts
         self._num_train_ids = train_dataset.num_train_ids

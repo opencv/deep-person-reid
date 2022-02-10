@@ -1,6 +1,6 @@
 import torch
 from torch import nn
-import torch.nn.functional as F
+
 
 class AsymmetricLoss(nn.Module):
     ''' Notice - optimized version, minimizes memory allocation and gpu uploading,

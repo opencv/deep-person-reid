@@ -70,7 +70,7 @@ class MultiheadEngine(Engine):
         self.ml_losses = list()
         self.loss_kl = nn.KLDivLoss(reduction='batchmean')
 
-        self.mixed_cls_heads_info = self.datamanager.train_dataset.mixed_cls_heads_info
+        self.mixed_cls_heads_info = self.datamanager.train_loader.dataset.mixed_cls_heads_info
         self.multiclass_loss = None
         self.multilabel_loss = None
 
