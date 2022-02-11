@@ -8,7 +8,7 @@
 # pylint: disable=too-many-branches,multiple-statements
 
 from __future__ import absolute_import, division, print_function
-from abc import abstractmethod
+import abc
 import datetime
 import os
 import os.path as osp
@@ -25,7 +25,6 @@ from torch.optim.lr_scheduler import OneCycleLR
 from torchreid.integration.nncf.compression import (get_nncf_complession_stage,
                                                     get_nncf_prepare_for_tensorboard)
 from torchreid.optim import ReduceLROnPlateauV2, WarmupScheduler, CosineAnnealingCycleRestart
-from torchreid import metrics
 from torchreid.utils import (AverageMeter, MetricMeter, get_model_attr,
                              open_all_layers, open_specified_layers,
                              save_checkpoint, ModelEmaV2)
@@ -46,7 +45,7 @@ def _get_cur_action_from_epoch_interval(epoch_interval, epoch):
     return epoch_interval.value_inside
 
 
-class Engine:
+class Engine(metaclass=abc.ABCMeta):
     r"""A generic base Engine class for both image- and video-reid."""
     def __init__(self,
                  datamanager,
@@ -551,7 +550,7 @@ class Engine:
 
         return losses.meters['loss'].avg
 
-    @abstractmethod
+    @abc.abstractmethod
     def forward_backward(self, data):
         pass
 
@@ -581,68 +580,33 @@ class Engine:
         should_save_ema_model = False
 
         print('##### Evaluating test dataset) #####')
-        # TO DO reduce amount of code for evaluation functions (DRY rule)
         for model_id, (model_name, model) in enumerate(self.models.items()):
             ema_condition = (self.use_ema_decay and not lr_finder
                     and not test_only and model_name == self.main_model_name)
-            model_type = get_model_attr(model, 'type')
             # do not evaluate second model till last epoch
             if (model_name != self.main_model_name
                     and not test_only and epoch != (self.max_epoch - 1)):
                 continue
-
-            if model_type == 'classification':
-                cur_top1 = self._evaluate_classification(
-                    model=model,
+            # we may compute some other metric here, but consider it as top1 for consistency
+            # with single label classification
+            cur_top1 = self._evaluate(
+                model=model,
+                epoch=epoch,
+                data_loader=self.test_loader,
+                model_name=model_name,
+                topk=topk,
+                lr_finder=lr_finder
+            )
+            if ema_condition:
+                ema_top1 = self._evaluate(
+                    model=self.ema_model.module,
                     epoch=epoch,
                     data_loader=self.test_loader,
-                    model_name=model_name,
+                    model_name='EMA model',
                     topk=topk,
-                    lr_finder=lr_finder
+                    lr_finder = lr_finder
                 )
-                if ema_condition:
-                    ema_top1 = self._evaluate_classification(
-                        model=self.ema_model.module,
-                        epoch=epoch,
-                        data_loader=self.test_loader,
-                        model_name='EMA model',
-                        topk=topk,
-                        lr_finder = lr_finder
-                    )
-            elif model_type == 'multilabel':
-                # we compute mAP, but consider it top1 for consistency
-                # with single label classification
-                cur_top1 = self._evaluate_multilabel_classification(
-                    model=model,
-                    epoch=epoch,
-                    data_loader=self.test_loader,
-                    model_name=model_name,
-                    lr_finder=lr_finder
-                )
-                if ema_condition:
-                    ema_top1 = self._evaluate_multilabel_classification(
-                        model=self.ema_model.module,
-                        epoch=epoch,
-                        data_loader=self.test_loader,
-                        model_name='EMA model',
-                        lr_finder = lr_finder
-                    )
-            elif model_type == 'multihead':
-                cur_top1 = self._evaluate_multihead_classification(
-                    model=model,
-                    epoch=epoch,
-                    data_loader=self.test_loader,
-                    model_name=model_name,
-                    lr_finder=lr_finder
-                )
-                if ema_condition:
-                    ema_top1 = self._evaluate_multihead_classification(
-                        model=self.ema_model.module,
-                        epoch=epoch,
-                        data_loader=self.test_loader,
-                        model_name='EMA model',
-                        lr_finder = lr_finder
-                    )
+
             if model_id == 0:
                 # the function should return accuracy results for the first (main) model only
                 if self.use_ema_decay and ema_top1 >= cur_top1:
@@ -652,70 +616,6 @@ class Engine:
                     top1 = cur_top1
 
         return top1, should_save_ema_model
-
-    @torch.no_grad()
-    def _evaluate_multilabel_classification(self, model, epoch, data_loader, model_name, lr_finder):
-        mAP, mean_p_c, mean_r_c, mean_f_c, p_o, r_o, f_o = metrics.evaluate_multilabel_classification(data_loader,
-                                                                                                      model,
-                                                                                                      self.use_gpu)
-
-        if self.writer is not None and not lr_finder:
-            self.writer.add_scalar(f'Val/{model_name}/mAP', mAP, epoch + 1)
-
-        if not lr_finder:
-            print(f'** Results ({model_name}) **')
-            print(f'mAP: {mAP:.2%}')
-            print(f'P_O: {p_o:.2%}')
-            print(f'R_O: {r_o:.2%}')
-            print(f'F_O: {f_o:.2%}')
-            print(f'mean_P_C: {mean_p_c:.2%}')
-            print(f'mean_R_C: {mean_r_c:.2%}')
-            print(f'mean_F_C: {mean_f_c:.2%}')
-
-        return mAP
-
-    @torch.no_grad()
-    def _evaluate_classification(self, model, epoch, data_loader, model_name, topk, lr_finder):
-        labelmap = []
-
-        if data_loader.dataset.classes and get_model_attr(model, 'classification_classes') and \
-                len(data_loader.dataset.classes) < len(get_model_attr(model, 'classification_classes')):
-
-            for class_name in sorted(data_loader.dataset.classes.keys()):
-                labelmap.append(data_loader.dataset.classes[class_name])
-
-        cmc, mAP, norm_cm = metrics.evaluate_classification(data_loader, model, self.use_gpu, topk, labelmap)
-
-        if self.writer is not None and not lr_finder:
-            self.writer.add_scalar(f'Val/{model_name}/mAP', mAP, epoch + 1)
-            for i, r in enumerate(topk):
-                self.writer.add_scalar('Val/{model_name}/Top-{r}', cmc[i], epoch + 1)
-
-        if not lr_finder:
-            print(f'** Results ({model_name}) **')
-            print(f'mAP: {mAP:.2%}')
-            for i, r in enumerate(topk):
-                print(f'Top-{r:<3}: {cmc[i]:.2%}')
-            if norm_cm.shape[0] <= 20:
-                metrics.show_confusion_matrix(norm_cm)
-
-        return cmc[0]
-
-    @torch.no_grad()
-    def _evaluate_multihead_classification(self, model, epoch, data_loader, model_name, lr_finder):
-        mhacc, acc, mAP = metrics.evaluate_multihead_classification(data_loader, model, self.use_gpu,
-                                                                    self.mixed_cls_heads_info)
-
-        if self.writer is not None and not lr_finder:
-            self.writer.add_scalar(f'Val/{model_name}/MHAcc', mhacc, epoch + 1)
-
-        if not lr_finder:
-            print(f'** Results ({model_name}) **')
-            print(f'MHAcc: {mhacc:.2%}')
-            print(f'mAP: {mAP:.2%}')
-            print(f'avgClsAcc: {acc:.2%}')
-
-        return acc
 
     @staticmethod
     def parse_data_for_train(data, use_gpu=False):
@@ -750,3 +650,7 @@ class Engine:
         else:
             for model in self.models.values():
                 open_all_layers(model)
+
+    @abc.abstractmethod
+    def _evaluate(self, model, epoch, data_loader, model_name, topk, lr_finder):
+        return 0.

@@ -18,7 +18,7 @@ from torchreid.engine.engine import Engine
 from torchreid.utils import sample_mask
 from torchreid.losses import (AMSoftmaxLoss, CrossEntropyLoss)
 from torchreid.optim import SAM
-
+from torchreid.utils import get_model_attr
 
 class ImageAMSoftmaxEngine(Engine):
     r"""AM-Softmax-loss engine for image-reid.
@@ -272,7 +272,6 @@ class ImageAMSoftmaxEngine(Engine):
 
         return imgs
 
-
     def exit_on_plateau_and_choose_best(self, accuracy):
         '''
         The function returns a pair (should_exit, is_candidate_for_best).
@@ -307,3 +306,30 @@ class ImageAMSoftmaxEngine(Engine):
             is_candidate_for_best = True
 
         return should_exit, is_candidate_for_best
+
+    @torch.no_grad()
+    def _evaluate(self, model, epoch, data_loader, model_name, topk, lr_finder):
+        labelmap = []
+
+        if data_loader.dataset.classes and get_model_attr(model, 'classification_classes') and \
+                len(data_loader.dataset.classes) < len(get_model_attr(model, 'classification_classes')):
+
+            for class_name in sorted(data_loader.dataset.classes.keys()):
+                labelmap.append(data_loader.dataset.classes[class_name])
+
+        cmc, mAP, norm_cm = metrics.evaluate_classification(data_loader, model, self.use_gpu, topk, labelmap)
+
+        if self.writer is not None and not lr_finder:
+            self.writer.add_scalar(f'Val/{model_name}/mAP', mAP, epoch + 1)
+            for i, r in enumerate(topk):
+                self.writer.add_scalar('Val/{model_name}/Top-{r}', cmc[i], epoch + 1)
+
+        if not lr_finder:
+            print(f'** Results ({model_name}) **')
+            print(f'mAP: {mAP:.2%}')
+            for i, r in enumerate(topk):
+                print(f'Top-{r:<3}: {cmc[i]:.2%}')
+            if norm_cm.shape[0] <= 20:
+                metrics.show_confusion_matrix(norm_cm)
+
+        return cmc[0]

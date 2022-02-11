@@ -55,7 +55,6 @@ def build_engine(cfg, datamanager, model, optimizer, scheduler,
             amb_k = cfg.loss.am_binary.amb_k,
             amb_t=cfg.loss.am_binary.amb_t,
             mix_precision=cfg.train.mix_precision)
-    cfg.model.type
 
     if cfg.model.type == 'classification':
         engine = ImageAMSoftmaxEngine(

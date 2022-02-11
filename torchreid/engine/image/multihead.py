@@ -6,12 +6,11 @@ from __future__ import absolute_import, division, print_function
 
 import numpy as np
 import torch
-import torch.nn as nn
-import torch.nn.functional as F
+from torch import nn
 from torch.cuda.amp import GradScaler, autocast
 
 from torchreid import metrics
-from torchreid.engine import Engine
+from torchreid.engine.engine import Engine
 from torchreid.losses import AMSoftmaxLoss, CrossEntropyLoss
 from torchreid.losses import AsymmetricLoss, AMBinaryLoss
 from torchreid.optim import SAM
@@ -67,7 +66,7 @@ class MultiheadEngine(Engine):
         self.mix_precision = mix_precision
         self.scaler = GradScaler(enabled=mix_precision)
 
-        self.ml_losses = list()
+        self.ml_losses = []
         self.loss_kl = nn.KLDivLoss(reduction='batchmean')
 
         self.mixed_cls_heads_info = self.datamanager.train_loader.dataset.mixed_cls_heads_info
@@ -137,10 +136,10 @@ class MultiheadEngine(Engine):
         for step in steps:
             # if sam is enabled then statistics will be written each step, but will be saved only the second time
             # this is made just for convenience
-            loss_summary = dict()
+            loss_summary = {}
 
             for i, model_name in enumerate(model_names):
-                loss, model_loss_summary, acc, scaled_logits = self._single_model_losses(
+                loss, model_loss_summary, acc, _ = self._single_model_losses(
                     self.models[model_name], imgs, targets, n_iter, model_name
                     )
                 loss_summary.update(model_loss_summary)
@@ -194,7 +193,7 @@ class MultiheadEngine(Engine):
         with autocast(enabled=self.mix_precision):
             model_output = model(imgs)
             all_logits = model_output[0] if isinstance(model_output, (tuple, list)) else model_output
-            loss_summary = dict()
+            loss_summary = {}
             acc = 0
             trg_num_samples = targets.numel()
             if trg_num_samples == 0:
@@ -220,9 +219,9 @@ class MultiheadEngine(Engine):
                 loss += self.multilabel_loss(head_logits, head_gt, scale=self.scales[model_name])
                 acc += metrics.accuracy_multilabel(head_logits * self.scales[model_name], head_gt).item()
 
-            acc /= self.mixed_cls_heads_info['num_multiclass_heads'] + int(self.multilabel_loss != None)
+            acc /= self.mixed_cls_heads_info['num_multiclass_heads'] + int(self.multilabel_loss is not None)
 
-            loss_summary[f'main_{model_name}'] = loss.item()
+            loss_summary[f'{model_name}'] = loss.item()
 
             scaled_logits = self.scales[model_name] * all_logits
 
@@ -253,7 +252,8 @@ class MultiheadEngine(Engine):
             if round(self.current_lr, 8) < round(self.initial_lr, 8):
                 self.iter_to_wait += 1
                 if self.iter_to_wait >= self.train_patience:
-                    print("LOG:: The training should be stopped due to no improvements for {} epochs".format(self.train_patience))
+                    print("LOG:: The training should be stopped due to no improvements",
+                          "for {self.train_patience} epochs")
                     should_exit = True
         else:
             self.best_metric = current_metric
@@ -261,3 +261,19 @@ class MultiheadEngine(Engine):
             is_candidate_for_best = True
 
         return should_exit, is_candidate_for_best
+
+    @torch.no_grad()
+    def _evaluate(self, model, epoch, data_loader, model_name, topk, lr_finder):
+        mhacc, acc, mAP = metrics.evaluate_multihead_classification(data_loader, model, self.use_gpu,
+                                                                    self.mixed_cls_heads_info)
+
+        if self.writer is not None and not lr_finder:
+            self.writer.add_scalar(f'Val/{model_name}/MHAcc', mhacc, epoch + 1)
+
+        if not lr_finder:
+            print(f'** Results ({model_name}) **')
+            print(f'MHAcc: {mhacc:.2%}')
+            print(f'mAP: {mAP:.2%}')
+            print(f'avgClsAcc: {acc:.2%}')
+
+        return acc

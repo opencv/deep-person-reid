@@ -228,3 +228,24 @@ class MultilabelEngine(Engine):
         """
         assert 0 < alpha <= 1
         self.prev_smooth_accuracy = alpha * cur_metric + (1. - alpha) * self.prev_smooth_accuracy
+
+    @torch.no_grad()
+    def _evaluate(self, model, epoch, data_loader, model_name, topk, lr_finder):
+        mAP, mean_p_c, mean_r_c, mean_f_c, p_o, r_o, f_o = metrics.evaluate_multilabel_classification(data_loader,
+                                                                                                      model,
+                                                                                                      self.use_gpu)
+
+        if self.writer is not None and not lr_finder:
+            self.writer.add_scalar(f'Val/{model_name}/mAP', mAP, epoch + 1)
+
+        if not lr_finder:
+            print(f'** Results ({model_name}) **')
+            print(f'mAP: {mAP:.2%}')
+            print(f'P_O: {p_o:.2%}')
+            print(f'R_O: {r_o:.2%}')
+            print(f'F_O: {f_o:.2%}')
+            print(f'mean_P_C: {mean_p_c:.2%}')
+            print(f'mean_R_C: {mean_r_c:.2%}')
+            print(f'mean_F_C: {mean_f_c:.2%}')
+
+        return mAP
