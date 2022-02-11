@@ -221,7 +221,7 @@ class MultiheadEngine(Engine):
 
             acc /= self.mixed_cls_heads_info['num_multiclass_heads'] + int(self.multilabel_loss is not None)
 
-            loss_summary[f'{model_name}'] = loss.item()
+            loss_summary[model_name] = loss.item()
 
             scaled_logits = self.scales[model_name] * all_logits
 
