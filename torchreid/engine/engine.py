@@ -707,13 +707,13 @@ class Engine:
                                                                     self.mixed_cls_heads_info)
 
         if self.writer is not None and not lr_finder:
-            self.writer.add_scalar('Val/{}/MHAcc'.format(model_name), mhacc, epoch + 1)
+            self.writer.add_scalar(f'Val/{model_name}/MHAcc', mhacc, epoch + 1)
 
         if not lr_finder:
             print(f'** Results ({model_name}) **')
-            print('MHAcc: {:.2%}'.format(mhacc))
-            print('mAP: {:.2%}'.format(mAP))
-            print('avgClsAcc: {:.2%}'.format(acc))
+            print(f'MHAcc: {mhacc:.2%}')
+            print(f'mAP: {mAP:.2%}')
+            print(f'avgClsAcc: {acc:.2%}')
 
         return acc
 
