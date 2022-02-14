@@ -21,12 +21,9 @@ model:
 custom_datasets:
   roots: ['data/CIFAR100/train', 'data/CIFAR100/val']
   types: ['classification_image_folder', 'classification_image_folder']
-  names: ['CIFAR100_train', 'CIFAR100_val']
 
 data:
   root: './'
-  sources: ['CIFAR100_train']
-  targets: ['CIFAR100_val']
   height: 224
   width: 224
   norm_mean: [0.5, 0.5, 0.5]
