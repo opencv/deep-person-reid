@@ -262,28 +262,25 @@ def wrap_nncf_model(model, cfg,
                                'to wrap_nncf_model')
 
         model_type = get_model_attr(model, 'type')
-        targets = list(test_loader.keys())
         use_gpu = cur_device.type == 'cuda'
-        for dataset_name in targets:
-            domain = 'source' if dataset_name in datamanager_for_init.sources else 'target'
-            print(f'##### Evaluating {dataset_name} ({domain}) #####')
-            if model_type == 'classification':
-                cmc, _, _ = evaluate_classification(
-                    test_loader[dataset_name]['query'],
-                    model,
-                    use_gpu=use_gpu
-                )
-                accuracy = cmc[0]
-            elif model_type == 'multilabel':
-                mAP, _, _, _, _, _, _ = evaluate_multilabel_classification(
-                    test_loader[dataset_name]['query'],
-                    model,
-                    use_gpu=use_gpu
-                )
-                accuracy = mAP
-            else:
-                raise ValueError(f'Cannot perform a model evaluation on the validation dataset'
-                                 f'since the model has unsupported model_type {model_type or "None"}')
+        print('##### Evaluating test dataset #####')
+        if model_type == 'classification':
+            cmc, _, _ = evaluate_classification(
+                test_loader,
+                model,
+                use_gpu=use_gpu
+            )
+            accuracy = cmc[0]
+        elif model_type == 'multilabel':
+            mAP, _, _, _, _, _, _ = evaluate_multilabel_classification(
+                test_loader,
+                model,
+                use_gpu=use_gpu
+            )
+            accuracy = mAP
+        else:
+            raise ValueError(f'Cannot perform a model evaluation on the validation dataset'
+                                f'since the model has unsupported model_type {model_type or "None"}')
 
         return accuracy
 
