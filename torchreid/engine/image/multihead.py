@@ -210,13 +210,17 @@ class MultiheadEngine(Engine):
                 loss += self.multiclass_loss(head_logits, head_gt, scale=self.scales[model_name])
                 acc += metrics.accuracy(head_logits, head_gt)[0].item()
 
+            if self.mixed_cls_heads_info['num_multiclass_heads'] > 1:
+                loss /= self.mixed_cls_heads_info['num_multiclass_heads']
+
             if self.multilabel_loss:
                 head_gt = targets[:,self.mixed_cls_heads_info['num_multiclass_heads']:]
                 head_logits = all_logits[:,self.mixed_cls_heads_info['num_single_label_classes']:]
                 valid_mask = head_gt >= 0
                 head_gt = head_gt[valid_mask].view(*valid_mask.shape)
                 head_logits = head_logits[valid_mask].view(*valid_mask.shape)
-                loss += self.multilabel_loss(head_logits, head_gt, scale=self.scales[model_name])
+                # multilabel_loss is assumed to perform no batch averaging
+                loss += self.multilabel_loss(head_logits, head_gt, scale=self.scales[model_name]) / head_logits.shape[0]
                 acc += metrics.accuracy_multilabel(head_logits * self.scales[model_name], head_gt).item()
 
             acc /= self.mixed_cls_heads_info['num_multiclass_heads'] + int(self.multilabel_loss is not None)
@@ -253,7 +257,7 @@ class MultiheadEngine(Engine):
                 self.iter_to_wait += 1
                 if self.iter_to_wait >= self.train_patience:
                     print("LOG:: The training should be stopped due to no improvements",
-                          "for {self.train_patience} epochs")
+                          f"for {self.train_patience} epochs")
                     should_exit = True
         else:
             self.best_metric = current_metric
