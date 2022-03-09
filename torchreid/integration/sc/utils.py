@@ -270,10 +270,14 @@ class OTEClassificationDataset:
             class_indices = []
             item_labels = self.ote_dataset[i].get_roi_labels(self.labels,
                                                              include_empty=self.keep_empty_label)
+            ignored_labels = self.ote_dataset[i].ignored_labels
             if item_labels:
                 if not self.hierarchical:
                     for ote_lbl in item_labels:
-                        class_indices.append(self.label_names.index(ote_lbl.name))
+                        if not ote_lbl in ignored_labels:
+                            class_indices.append(self.label_names.index(ote_lbl.name))
+                        else:
+                            class_indices.append(-1)
                 else:
                     num_cls_heads = self.mixed_cls_heads_info['num_multiclass_heads']
 
@@ -286,7 +290,10 @@ class OTEClassificationDataset:
                         if group_idx < num_cls_heads:
                             class_indices[group_idx] = in_group_idx
                         else:
-                            class_indices[num_cls_heads + in_group_idx] = 1
+                            if not ote_lbl in ignored_labels:
+                                class_indices[num_cls_heads + in_group_idx] = 1
+                            else:
+                                class_indices[num_cls_heads + in_group_idx] = -1
 
             else: # this supposed to happen only on inference stage or if we have a negative in multilabel data
                 if self.mixed_cls_heads_info:
