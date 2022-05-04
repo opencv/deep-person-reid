@@ -133,6 +133,7 @@ def main():
     log_dir = cfg.data.tb_log_dir if cfg.data.tb_log_dir else cfg.data.save_dir
     run_training(cfg, datamanager, model, optimizer, scheduler, extra_device_ids,
                  aux_lr, tb_writer=SummaryWriter(log_dir=log_dir),
+                 aux_config_opts=args.aux_config_opts,
                  should_freeze_aux_models=should_freeze_aux_models,
                  nncf_metainfo=nncf_metainfo,
                  compression_ctrl=compression_ctrl)
