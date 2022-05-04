@@ -83,7 +83,7 @@ def make_nncf_changes_in_config(cfg,
     cfg.nncf.enable_pruning = enable_pruning
     nncf_preset = get_nncf_preset_name(enable_quantization, enable_pruning)
 
-    patch_config(cfg, nncf_preset)
+    cfg = patch_config(cfg, nncf_preset)
 
     if command_line_cfg_opts is not None:
         logger.info(f'applying changes to the main training config from the command line options just after that. '
