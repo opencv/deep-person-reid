@@ -355,11 +355,12 @@ class EfficientNet(ModelInterface):
             self.output.add_module("asl", AngleSimpleLinear(
                 in_features=final_block_channels,
                 out_features=self.num_classes))
-        else:
-            assert 'softmax' in self.loss or 'asl' in self.loss
+        elif 'softmax' in self.loss or 'asl' in self.loss:
             self.output.add_module("fc", nn.Linear(
                 in_features=final_block_channels,
                 out_features=self.num_classes))
+        else:
+            raise ValueError(f"self.loss={self.loss} is unknown loss type.")
 
         self._init_params()
 
