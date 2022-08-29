@@ -21,9 +21,9 @@ from copy import deepcopy
 import torch
 from torch import nn
 
-from .tools import mkdir_if_missing, check_isfile
-
 from pathlib import Path
+
+from .tools import mkdir_if_missing, check_isfile
 
 __all__ = [
     'save_checkpoint', 'load_checkpoint', 'resume_from_checkpoint',
